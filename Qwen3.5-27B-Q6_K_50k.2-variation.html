@@ -1,0 +1,582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird - Neon Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #0d0d0d 0%, #1a1a2e 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 0 40px rgba(0, 255, 255, 0.3), 0 0 80px rgba(255, 0, 255, 0.2);
+        }
+        #gameCanvas {
+            display: block;
+        }
+        #uiOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .score {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px;
+            color: #00ffff;
+            text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff;
+            z-index: 10;
+        }
+        .highScore {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 18px;
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            text-shadow: 0 0 10px rgba(255,255,255,0.5);
+        }
+        #gameOverScreen {
+            display: none;
+        }
+        h1 {
+            font-size: 48px;
+            margin-bottom: 20px;
+            background: linear-gradient(90deg, #00ffff, #ff00ff, #00ffff);
+            background-size: 200% auto;
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: glow 2s linear infinite;
+        }
+        @keyframes glow {
+            0% { background-position: 0% center; }
+            100% { background-position: 200% center; }
+        }
+        p {
+            font-size: 20px;
+        }
+        .powerup {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+            color: #ffff00;
+            text-shadow: 0 0 10px #ffff00;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="960" height="540"></canvas>
+        <div id="uiOverlay">
+            <div class="score" id="scoreDisplay">0</div>
+            <div class="highScore" id="highScoreDisplay">High Score: 0</div>
+            <div class="powerup" id="powerupDisplay">⚡ SPEED UP!</div>
+        </div>
+        <div id="startScreen">
+            <h1>NEON FLAPPY</h1>
+            <p>Press SPACE or Click to Start</p>
+            <p style="font-size: 16px; margin-top: 10px;">SPACE/Click to flap | Collect orbs for bonus!</p>
+            <p style="font-size: 14px; margin-top: 15px; color: #ff00ff;">🔴 Red orb = Speed up | 🔵 Blue orb = Slow motion | 🟡 Yellow orb = Points</p>
+        </div>
+        <div id="gameOverScreen">
+            <h1>GAME OVER</h1>
+            <p style="font-size: 24px;">Score: <span id="finalScore">0</span></p>
+            <p style="font-size: 18px; color: #ff00ff;">Best: <span id="finalHighScore">0</span></p>
+            <p style="font-size: 16px; margin-top: 10px;">Press SPACE/Click to restart</p>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const highScoreDisplay = document.getElementById('highScoreDisplay');
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const finalScore = document.getElementById('finalScore');
+        const finalHighScore = document.getElementById('finalHighScore');
+        const powerupDisplay = document.getElementById('powerupDisplay');
+
+        // Game constants
+        const BASE_GRAVITY = 0.5;
+        const BASE_FLAP_STRENGTH = -8;
+        const BASE_PIPE_SPEED = 3;
+        const PIPE_SPAWN_INTERVAL = 1500;
+        const PIPE_GAP = 150;
+        const PIPE_WIDTH = 60;
+
+        // Game state
+        let bird = {
+            x: 150,
+            y: canvas.height / 2,
+            width: 34,
+            height: 24,
+            velocity: 0,
+            rotation: 0
+        };
+
+        let pipes = [];
+        let orbs = [];
+        let particles = [];
+        let score = 0;
+        let highScore = localStorage.getItem('neonFlappyHighScore') || 0;
+        let gameRunning = false;
+        let lastPipeSpawn = 0;
+        let lastOrbSpawn = 0;
+        let animationId = null;
+        
+        // Power-up effects
+        let speedMultiplier = 1;
+        let gravityMultiplier = 1;
+        let powerupTimer = null;
+        let currentPowerup = null;
+
+        highScoreDisplay.textContent = `High Score: ${highScore}`;
+
+        function drawBird() {
+            ctx.save();
+            ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
+            bird.rotation = Math.min(Math.max(bird.velocity * 3, -25), 90);
+            ctx.rotate(bird.rotation * Math.PI / 180);
+            
+            // Neon glow effect
+            const glowColor = currentPowerup === 'speed' ? '#ff0000' : 
+                             currentPowerup === 'slow' ? '#00ffff' : '#ff00ff';
+            
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = glowColor;
+            
+            // Body with gradient
+            const gradient = ctx.createRadialGradient(0, 0, 0, 0, 0, bird.width / 2);
+            gradient.addColorStop(0, '#ffffff');
+            gradient.addColorStop(0.3, glowColor);
+            gradient.addColorStop(1, '#ff00ff');
+            
+            ctx.fillStyle = gradient;
+            ctx.beginPath();
+            ctx.ellipse(0, 0, bird.width / 2, bird.height / 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Eye
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#00ffff';
+            ctx.fillStyle = '#00ffff';
+            ctx.beginPath();
+            ctx.arc(8, -5, 6, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = '#000000';
+            ctx.beginPath();
+            ctx.arc(10, -5, 3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Beak
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ffff00';
+            ctx.fillStyle = '#ffff00';
+            ctx.beginPath();
+            ctx.moveTo(12, 2);
+            ctx.lineTo(22, 6);
+            ctx.lineTo(12, 10);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+
+        function drawPipes() {
+            pipes.forEach(pipe => {
+                const gradient = ctx.createLinearGradient(pipe.x, 0, pipe.x + PIPE_WIDTH, 0);
+                gradient.addColorStop(0, '#ff00ff');
+                gradient.addColorStop(0.5, '#00ffff');
+                gradient.addColorStop(1, '#ff00ff');
+                
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff00ff';
+                ctx.fillStyle = gradient;
+                ctx.strokeStyle = '#ffffff';
+                ctx.lineWidth = 2;
+                
+                // Top pipe with glowing edges
+                ctx.fillRect(pipe.x, 0, PIPE_WIDTH, pipe.topHeight);
+                ctx.strokeRect(pipe.x, 0, PIPE_WIDTH, pipe.topHeight);
+                
+                // Cap with extra glow
+                ctx.shadowBlur = 25;
+                ctx.fillRect(pipe.x - 5, pipe.topHeight - 25, PIPE_WIDTH + 10, 25);
+                ctx.strokeRect(pipe.x - 5, pipe.topHeight - 25, PIPE_WIDTH + 10, 25);
+                
+                // Bottom pipe
+                ctx.shadowBlur = 15;
+                ctx.fillRect(pipe.x, pipe.bottomY, PIPE_WIDTH, canvas.height - pipe.bottomY - 20);
+                ctx.strokeRect(pipe.x, pipe.bottomY, PIPE_WIDTH, canvas.height - pipe.bottomY - 20);
+                
+                // Bottom cap
+                ctx.shadowBlur = 25;
+                ctx.fillRect(pipe.x - 5, pipe.bottomY, PIPE_WIDTH + 10, 25);
+                ctx.strokeRect(pipe.x - 5, pipe.bottomY, PIPE_WIDTH + 10, 25);
+                
+                ctx.shadowBlur = 0;
+            });
+        }
+
+        function drawOrbs() {
+            orbs.forEach(orb => {
+                ctx.save();
+                ctx.translate(orb.x, orb.y);
+                
+                const pulse = Math.sin(Date.now() / 100) * 5;
+                
+                ctx.shadowBlur = 20 + pulse;
+                ctx.shadowColor = orb.color;
+                ctx.fillStyle = orb.color;
+                
+                // Outer glow ring
+                ctx.beginPath();
+                ctx.arc(0, 0, 15 + pulse, 0, Math.PI * 2);
+                ctx.strokeStyle = orb.color;
+                ctx.lineWidth = 2;
+                ctx.stroke();
+                
+                // Inner orb
+                ctx.beginPath();
+                ctx.arc(0, 0, 12, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Shine
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(-4, -4, 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            });
+        }
+
+        function drawParticles() {
+            particles.forEach((particle, index) => {
+                ctx.save();
+                ctx.globalAlpha = particle.life;
+                ctx.fillStyle = particle.color;
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size * particle.life, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.restore();
+                
+                // Remove dead particles
+                if (particle.life <= 0) {
+                    particles.splice(index, 1);
+                }
+            });
+        }
+
+        function createParticles(x, y, color, count = 10) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    size: Math.random() * 4 + 2,
+                    color: color,
+                    life: 1
+                });
+            }
+        }
+
+        function drawBackground() {
+            // Dark background with grid
+            ctx.fillStyle = '#0a0a0a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Animated grid
+            const gridSize = 40;
+            const offset = (Date.now() / 50) % gridSize;
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+            ctx.lineWidth = 1;
+            
+            for (let x = -offset; x < canvas.width; x += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(x, 0);
+                ctx.lineTo(x, canvas.height);
+                ctx.stroke();
+            }
+            
+            for (let y = 0; y < canvas.height; y += gridSize) {
+                ctx.beginPath();
+                ctx.moveTo(0, y);
+                ctx.lineTo(canvas.width, y);
+                ctx.stroke();
+            }
+            
+            // Ground with neon effect
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = '#ff00ff';
+            ctx.fillStyle = '#1a0a1a';
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+            ctx.strokeStyle = '#ff00ff';
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height - 20);
+            ctx.lineTo(canvas.width, canvas.height - 20);
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        }
+
+        function spawnOrb() {
+            const orbTypes = [
+                { type: 'speed', color: '#ff0000', points: 0 },
+                { type: 'slow', color: '#00ffff', points: 0 },
+                { type: 'points', color: '#ffff00', points: 5 }
+            ];
+            
+            const orbType = orbTypes[Math.floor(Math.random() * orbTypes.length)];
+            
+            orbs.push({
+                x: canvas.width,
+                y: Math.random() * (canvas.height - 100) + 50,
+                radius: 12,
+                type: orbType.type,
+                color: orbType.color,
+                points: orbType.points
+            });
+        }
+
+        function activatePowerup(type) {
+            currentPowerup = type;
+            
+            if (type === 'speed') {
+                speedMultiplier = 1.5;
+                gravityMultiplier = 0.8;
+            } else if (type === 'slow') {
+                speedMultiplier = 0.6;
+                gravityMultiplier = 1.3;
+            }
+            
+            powerupDisplay.textContent = type === 'speed' ? '⚡ SPEED UP!' : '🌊 SLOW MOTION!';
+            powerupDisplay.style.opacity = '1';
+            
+            if (powerupTimer) clearTimeout(powerupTimer);
+            powerupTimer = setTimeout(() => {
+                speedMultiplier = 1;
+                gravityMultiplier = 1;
+                currentPowerup = null;
+                powerupDisplay.style.opacity = '0';
+            }, 5000);
+        }
+
+        function update() {
+            if (!gameRunning) return;
+            
+            const gravity = BASE_GRAVITY * gravityMultiplier;
+            const pipeSpeed = BASE_PIPE_SPEED * speedMultiplier;
+            
+            // Bird physics
+            bird.velocity += gravity;
+            bird.y += bird.velocity;
+            
+            // Spawn pipes
+            if (Date.now() - lastPipeSpawn > PIPE_SPAWN_INTERVAL / speedMultiplier) {
+                const minHeight = 50;
+                const maxHeight = canvas.height - PIPE_GAP - minHeight - 20;
+                const topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+                
+                pipes.push({
+                    x: canvas.width,
+                    topHeight: topHeight,
+                    bottomY: topHeight + PIPE_GAP,
+                    passed: false
+                });
+                lastPipeSpawn = Date.now();
+            }
+            
+            // Spawn orbs
+            if (Date.now() - lastOrbSpawn > 4000) {
+                spawnOrb();
+                lastOrbSpawn = Date.now();
+            }
+            
+            // Update pipes
+            pipes.forEach(pipe => {
+                pipe.x -= pipeSpeed;
+                
+                if (!pipe.passed && pipe.x + PIPE_WIDTH < bird.x) {
+                    pipe.passed = true;
+                    score++;
+                    scoreDisplay.textContent = score;
+                    createParticles(pipe.x + PIPE_WIDTH, canvas.height / 2, '#00ffff', 5);
+                }
+            });
+            
+            // Update orbs
+            orbs.forEach((orb, index) => {
+                orb.x -= pipeSpeed;
+                
+                // Collision with bird
+                const dx = bird.x + bird.width / 2 - orb.x;
+                const dy = bird.y + bird.height / 2 - orb.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < bird.width / 2 + orb.radius) {
+                    // Collect orb
+                    score += orb.points;
+                    scoreDisplay.textContent = score;
+                    createParticles(orb.x, orb.y, orb.color, 15);
+                    
+                    if (orb.type !== 'points') {
+                        activatePowerup(orb.type);
+                    }
+                    
+                    orbs.splice(index, 1);
+                } else if (orb.x < -30) {
+                    orbs.splice(index, 1);
+                }
+            });
+            
+            // Update particles
+            particles.forEach(particle => {
+                particle.x += particle.vx;
+                particle.y += particle.vy;
+                particle.life -= 0.02;
+            });
+            
+            // Remove off-screen pipes
+            pipes = pipes.filter(pipe => pipe.x + PIPE_WIDTH > -50);
+            
+            checkCollisions();
+            
+            if (bird.y + bird.height > canvas.height - 20 || bird.y < 0) {
+                gameOver();
+            }
+        }
+
+        function checkCollisions() {
+            for (let pipe of pipes) {
+                if (bird.x + bird.width > pipe.x && bird.x < pipe.x + PIPE_WIDTH) {
+                    if (bird.y < pipe.topHeight || bird.y + bird.height > pipe.bottomY) {
+                        gameOver();
+                        break;
+                    }
+                }
+            }
+        }
+
+        function draw() {
+            drawBackground();
+            drawPipes();
+            drawOrbs();
+            drawParticles();
+            drawBird();
+        }
+
+        function gameLoop() {
+            update();
+            draw();
+            if (gameRunning) {
+                animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+
+        function flap() {
+            if (!gameRunning) {
+                startGame();
+            } else {
+                bird.velocity = BASE_FLAP_STRENGTH * gravityMultiplier;
+                createParticles(bird.x, bird.y + bird.height, '#ff00ff', 5);
+            }
+        }
+
+        function startGame() {
+            bird = {
+                x: 150,
+                y: canvas.height / 2,
+                width: 34,
+                height: 24,
+                velocity: 0,
+                rotation: 0
+            };
+            pipes = [];
+            orbs = [];
+            particles = [];
+            score = 0;
+            scoreDisplay.textContent = '0';
+            gameRunning = true;
+            lastPipeSpawn = Date.now();
+            lastOrbSpawn = Date.now();
+            speedMultiplier = 1;
+            gravityMultiplier = 1;
+            currentPowerup = null;
+            if (powerupTimer) clearTimeout(powerupTimer);
+            
+            startScreen.style.display = 'none';
+            gameOverScreen.style.display = 'none';
+            
+            gameLoop();
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('neonFlappyHighScore', highScore);
+                highScoreDisplay.textContent = `High Score: ${highScore}`;
+            }
+            
+            finalScore.textContent = score;
+            finalHighScore.textContent = highScore;
+            gameOverScreen.style.display = 'block';
+            
+            createParticles(bird.x + bird.width / 2, bird.y + bird.height / 2, '#ff0000', 30);
+            draw();
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                flap();
+            }
+        });
+
+        canvas.addEventListener('click', flap);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            flap();
+        });
+
+        // Initial draw
+        drawBackground();
+        drawBird();
+    </script>
+</body>
+</html>
