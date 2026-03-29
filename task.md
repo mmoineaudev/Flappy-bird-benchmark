@@ -1,6 +1,7 @@
 # project directory 
 
-* filename is : 'nvidia_Nemotron-Cascade-2-30B-A3B-Q6_K-q8_0'
+* filename is : 'GLM-4.7-Flash-Q6_K
+'
 * /home/neo/Desktop/flappy-birdZZZZs/
 
 # your task  
