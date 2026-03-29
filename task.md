@@ -1,5 +1,6 @@
 # project directory 
 
+* filename is : 'nvidia_Nemotron-Cascade-2-30B-A3B-Q6_K-q8_0'
 * /home/neo/Desktop/flappy-birdZZZZs/
 
 # your task  
