@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Bird - Variation</title>
+<style>
+body { margin:0; overflow:hidden; background:linear-gradient(to bottom, #70c5ce, #5fb7e6); display:flex; justify-content:center; align-items:center; }
+canvas { background:transparent; border:2px solid #000; }
+</style>
+</head>
+<body>
+<canvas id="game" width="960" height="540"></canvas>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const g=0.6;
+const bird={x:100,y:270,w:34,h:24,vy:0};
+let pipes=[];
+let score=0;
+let audioCtx=new (window.AudioContext||window.webkitAudioContext)();
+function playBeep(){
+  const osc=audioCtx.createOscillator();
+  const gain=audioCtx.createGain();
+  osc.frequency.value=440;
+  gain.gain.value=0.1;
+  osc.connect(gain).connect(audioCtx.destination);
+  osc.start();osc.stop(audioCtx.currentTime+0.05);
+}
+function reset(){bird.y=270;bird.vy=0;pipes=[];score=0;}
+function spawn(){
+  pipes.push({x:canvas.width, gap:120, topHeight:Math.random()*200+50});
+}
+function loop(){
+  requestAnimationFrame(loop);
+  bird.vy+=g;bird.y+=bird.vy;
+  // clear background
+  ctx.fillStyle='white';
+  ctx.fillRect(0,0,960,540);
+  // draw bird
+  ctx.fillStyle='#ff4500';
+  ctx.fillRect(bird.x,bird.y,bird.w,bird.h);
+  // draw pipes
+  ctx.fillStyle='#0f0';
+  pipes.forEach(p=>{
+    p.x-=2;
+    ctx.fillRect(p.x,0,p.x+p.w,p.gap);
+    ctx.fillRect(p.x,p.gap+p.h,p.w,p.h);
+    // play beep when bird passes pipe
+    if(p.x+p.w<bird.x && p.x+p.w+2>=bird.x && !p.beeped){
+      playBeep();
+      p.beeped=true;
+    }
+  });
+  // remove off-screen pipes and check collision
+  if(pipes.length && pipes[0].x+ pipes[0].w<0){
+    pipes.shift();
+  }
+  if(bird.y+bird.h>canvas.height||bird.y<0||pipes.some(p=>bird.x<p.x+p.w&&bird.x+bird.w>p.x&&bird.y<p.gap)){
+    reset();
+  }
+  // score handling
+  if(pipes.some(p=>p.x<0 && p.x+p.w<0)){ // pipe passed
+    // already removed, so count when pipe.x passed bird
+    if(pipes.length===0 && bird.x>pipes[0]?.x){
+    }
+  }
+  // draw score
+  ctx.fillStyle='black';
+  ctx.font='24px sans-serif';
+  ctx.fillText('Score: '+score, 10, 30);
+}
+document.addEventListener('keydown',e=>{if(e.code==='Space') bird.vy=-8;});
+spawn();
+loop();
+</script>
+</body>
+</html>

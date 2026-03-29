@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Bird - First Output</title>
+<style>
+body { margin:0; overflow:hidden; background:#70c5ce; display:flex; justify-content:center; align-items:center; }
+canvas { background:#70c5ce; border:2px solid #000; }
+</style>
+</head>
+<body>
+<canvas id="game" width="960" height="540"></canvas>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const g=0.6;
+const bird={x:100,y:270,w:34,h:24,vy:0};
+let pipes=[];
+let score=0;
+function reset(){bird.y=270;bird.vy=0;pipes=[];score=0;}
+function spawn(){pipes.push({x:canvas.width, gap:120, topHeight:Math.random()*200+50});}
+function loop(){requestAnimationFrame(loop);bird.vy+=g;bird.y+=bird.vy;ctx.clearRect(0,0,960,540);ctx.fillStyle='#70c5ce';ctx.fillRect(0,0,960,540);ctx.fillStyle='#ff0';ctx.fillRect(bird.x,bird.y,bird.w,bird.h);ctx.fillStyle='#0f0';pipes.forEach(p=>{p.x-=2;ctx.fillStyle='#0f0';ctx.fillRect(p.x,0,p.x+p.w,p.gap);ctx.fillRect(p.x,p.gap+p.h,p.w,p.h);if(p.x+ p.w<0){pipes.shift();if(bird.y+bird.h>canvas.height||bird.y<0||pipes.some(p=>bird.x<p.x+p.w&&bird.x+bird.w>p.x&&bird.y<p.gap) ){reset();} } });
+}
+document.addEventListener('keydown',e=>{if(e.code==='Space') bird.vy=-8;});
+spawn();
+loop();
+</script>
+</body>
+</html>
