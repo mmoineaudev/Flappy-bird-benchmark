@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #87CEEB;
+            font-family: Arial, sans-serif;
+        }
+        #game {
+            width: 800px;
+            height: 450px;
+            background: #87CEEB;
+            position: relative;
+        }
+        .bird {
+            width: 40px;
+            height: 30px;
+            background: #FFD700;
+            border-radius: 50% 50% 0 0;
+            position: absolute;
+        }
+        .pipe {
+            width: 60px;
+            height: 300px;
+            background: #32CD32;
+            position: absolute;
+            right: -60px;
+        }
+        .pipe-top, .pipe-bottom {
+            width: 60px;
+            position: absolute;
+        }
+        .pipe-top {
+            top: 0;
+            height: 250px;
+            border-bottom-left-radius: 15px;
+        }
+        .pipe-bottom {
+            height: 300px;
+            bottom: 0;
+            border-top-left-radius: 15px;
+        }
+        .ground {
+            width: 100%;
+            height: 80px;
+            background: #8B7355;
+            position: absolute;
+            bottom: 0;
+            left: 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="game">
+        <div class="bird" id="bird" style="top: 200px; left: 100px;"></div>
+        <div class="pipe pipe-top" id="pipe1" style="top: 0; left: 0;"></div>
+        <div class="pipe pipe-bottom" id="pipe2" style="bottom: 0; left: 0;"></div>
+        <div class="ground"></div>
+    </div>
+    <script>
+        let score = 0;
+        let gameState = true;
+        let birdY = 200;
+        let birdV = 0;
+        let pipes = [];
+        let score = 0;
+
+        function flap() {
+            birdV = -10;
+        }
+
+        function gameLoop() {
+            if (!gameState) return;
+
+            birdY += birdV;
+            birdV += 0.5; // gravity
+
+            // Update pipes
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                const pipe = pipes[i];
+                pipe.x += 5;
+
+                // Remove pipes that are off screen
+                if (pipe.x < -60) {
+                    pipes.splice(i, 1);
+                    if (i === 0) {
+                        pipes.push({x: 800, top: 100 + Math.random() * 300});
+                    }
+                }
+
+                // Check for collision with pipes
+                if (birdY < pipe.top + 250 || birdY > pipe.top + 250 && birdY < pipe.top + 350) {
+                    if (birdY < pipe.top || birdY > pipe.top + 250) {
+                        gameState = false;
+                    }
+                }
+            }
+
+            // Update score
+            score++;
+            if (score % 20 === 0) {
+                score = Math.floor(score / 20);
+            }
+
+            // Update positions
+            document.getElementById('bird').style.top = birdY + 'px';
+            for (let i = 0; i < pipes.length; i++) {
+                document.getElementById(`pipe${i + 1}`).style.left = pipes[i].x + 'px';
+            }
+
+            requestAnimationFrame(gameLoop);
+        }
+
+        document.getElementById('game').addEventListener('click', flap);
+        gameLoop();
+    </script>
+</head>
+<body>
+    <div id="game">
+        <div class="bird" style="width: 40px; height: 30px; background: #FFD700; position: absolute; left: 100px; top: 200px; border-radius: 15px 15px 0 0;"></div>
+        <div class="pipe-top" style="width: 60px; height: 250px; background: #32CD32; position: absolute; top: 0; left: 0; border-bottom-left-radius: 15px;"></div>
+        <div class="pipe-bottom" style="width: 60px; height: 300px; background: #32CD32; position: absolute; bottom: 0; left: 0; border-top-left-radius: 15px;"></div>
+    </div>
+</body>
+</html>

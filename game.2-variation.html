@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            background: #87CEEB;
+            font-family: Arial, sans-serif;
+        }
+        #game {
+            width: 800px;
+            height: 450px;
+            background: #87CEEB;
+            position: relative;
+            overflow: hidden;
+        }
+        .bird {
+            width: 40px;
+            height: 30px;
+            background: #FFD700;
+            position: absolute;
+            left: 100px;
+            top: 200px;
+            border-radius: 50% 50% 0 0;
+            transition: transform 0.1s;
+        }
+        .pipe {
+            width: 60px;
+            height: 300px;
+            position: absolute;
+            right: -60px;
+            transition: right 0.05s;
+        }
+        .pipe-top, .pipe-bottom {
+            width: 60px;
+            position: absolute;
+            background: #32CD32;
+        }
+        .pipe-top {
+            top: 0;
+            height: 250px;
+            border-bottom-left-radius: 15px;
+        }
+        .pipe-bottom {
+            height: 300px;
+            bottom: 0;
+            border-top-left-radius: 15px;
+        }
+        .cloud {
+            position: absolute;
+            opacity: 0.8;
+            transition: left 0.05s;
+        }
+        .cloud1 {
+            top: 50px;
+            left: 200px;
+            width: 60px;
+            height: 30px;
+            background: white;
+            border-radius: 20px;
+        }
+        .cloud2 {
+            top: 150px;
+            left: 500px;
+            width: 50px;
+            height: 25px;
+            background: white;
+            border-radius: 15px;
+        }
+        .cloud3 {
+            top: 80px;
+            left: 700px;
+            width: 70px;
+            height: 35px;
+            background: white;
+            border-radius: 25px;
+        }
+        .score-display {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            color: white;
+            background: rgba(255, 255, 255, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+        }
+        .game-over {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            color: white;
+            text-shadow: 2px 2px 4px #000000;
+            background: rgba(255, 0, 0, 0.7);
+            padding: 20px 40px;
+            border-radius: 10px;
+            display: none;
+        }
+        .restart {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 24px;
+            color: white;
+            background: #32CD32;
+            padding: 15px 30px;
+            border-radius: 10px;
+            cursor: pointer;
+            display: none;
+            transition: background 0.3s;
+        }
+        .restart:hover {
+            background: #2ecc32;
+        }
+    </style>
+</head>
+<body>
+    <div id="game">
+        <div class="cloud cloud1"></div>
+        <div class="cloud cloud2"></div>
+        <div class="bird" id="bird"></div>
+        <div class="pipe" id="pipe1">
+            <div class="pipe-top"></div>
+            <div class="pipe-bottom"></div>
+        </div>
+        <div class="pipe" id="pipe2" style="right: 300px; top: 100px;"></div>
+        <div class="pipe" id="pipe3" style="right: 500px; top: 200px;"></div>
+        <div class="score-display">Score: 0</div>
+        <div class="game-over" id="gameOver">Game Over!</div>
+        <div class="restart" id="restartButton">Play Again</div>
+        <div class="cloud cloud3"></div>
+    </div>
+
+    <script>
+        // Game variables
+        let birdY = 200;
+        let birdV = 0;
+        let pipes = [];
+        let score = 0;
+        let gameState = true;
+        let pipeInterval;
+        let gameLoop;
+        let pipes = [];
+
+        // Cloud positions
+        const clouds = [
+            {x: 200, y: 50, size: 60, speed: 0.3},
+            {x: 500, y: 150, size: 50, speed: 0.25},
+            {x: 700, y: 80, size: 70, speed: 0.2}
+        ];
+
+        // Update cloud positions
+        function updateClouds() {
+            clouds.forEach((cloud, index) => {
+                const cloudElement = document.querySelector(`.cloud${index + 1}`);
+                cloud.x -= cloud.speed;
+                cloudElement.style.left = cloud.x + 'px';
+                
+                // Reset cloud position if off screen
+                if (cloud.x < -cloud.size) {
+                    cloud.x = 850;
+                    cloud.y = Math.random() * 200 + 50;
+                }
+            });
+        }
+
+        // Create clouds
+        function createClouds() {
+            for (let i = 0; i < 3; i++) {
+                const cloud = {
+                    x: 200 + i * 300,
+                    y: 50 + Math.random() * 100,
+                    size: 60,
+                    speed: 0.3
+                };
+                const cloudElement = document.createElement('div');
+                cloudElement.classList.add('cloud');
+                cloudElement.classList.add(`cloud${i + 1}`);
+                cloudElement.style.width = cloud.size + 'px';
+                cloudElement.style.height = cloud.size * 0.5 + 'px';
+                cloudElement.style.top = cloud.y + 'px';
+                cloudElement.style.left = cloud.x + 'px';
+                document.getElementById('game').appendChild(cloudElement);
+            }
+        }
+
+        // Game loop
+        function gameLoop() {
+            if (!gameState) return;
+
+            // Update bird position
+            birdY += birdV;
+            document.getElementById('bird').style.top = birdY + 'px';
+            
+            // Update pipes
+            pipes.forEach(pipe => {
+                pipe.x += 4;
+                document.getElementById('pipe' + pipe.id).style.right = pipe.x + 'px';
+                
+                // Check for collision
+                const birdRect = document.getElementById('bird').getBoundingClientRect();
+                const pipeRect = document.getElementById('pipe' + pipe.id).getBoundingClientRect();
+                
+                if (birdRect.left < pipeRect.right && 
+                    birdRect.right > pipeRect.left && 
+                    (birdRect.top < pipeRect.bottom || birdRect.bottom > pipeRect.top)) {
+                    endGame();
+                }
+
+                // Check for score
+                if (pipe.x < 100 && pipe.x > 90 && !pipe.scored) {
+                    score++;
+                    pipe.scored = true;
+                    playScore();
+                }
+            });
+
+            // Update clouds
+            updateClouds();
+
+            // Update score display
+            document.getElementById('scoreDisplay').textContent = 'Score: ' + score;
+            
+            // Check if pipe passed
+            if (pipes[0] && pipes[0].x < 100) {
+                score++;
+                playScore();
+            }
+
+            // Check for pipe collision
+            if (pipes[0] && 
+                birdY < 250 || 
+                birdY > 200 + 30) { // Bird's height is 30
+                endGame();
+            }
+
+            gameLoop();
+        }
+
+        // Handle bird click
+        document.addEventListener('click', function(event) {
+            if (event.target.id === 'restartButton') {
+                restart();
+                return;
+            }
+            
+            if (event.target.id === 'bird' || event.target.parentElement.id === 'bird') {
+                birdV = -10;
+            }
+        });
+
+        // Start game
+        function startGame() {
+            gameLoop();
+        }
+
+        // Flap bird
+        function flap() {
+            if (gameState) {
+                birdV = -10;
+            }
+        }
+
+        // Play score
+        function playScore() {
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            scoreDisplay.style.transform = 'scale(1.2)';
+            setTimeout(() => {
+                scoreDisplay.style.transform = 'scale(1)';
+            }, 100);
+        }
+
+        // End game
+        function endGame() {
+            gameState = false;
+            document.getElementById('gameOver').style.display = 'block';
+            document.getElementById('restartButton').style.display = 'block';
+            clearInterval(gameLoop);
+            clearInterval(pipeInterval);
+        }
+
+        // Restart game
+        function restart() {
+            birdY = 200;
+            birdV = 0;
+            score = 0;
+            gameState = true;
+            endGame();
+            restart();
+        }
+
+        // Initialize game
+        createClouds();
+        gameLoop();
+
+    </script>
+</head>
+<body>
+    <div id="game">
+        <div class="bird" id="bird" style="width: 40px; height: 30px; background: #FFD700; position: absolute; left: 100px; top: 200px; border-radius: 15px 15px 0 0;"></div>
+        <div class="pipe" id="pipe1" style="width: 60px; height: 300px; position: absolute; right: -60px; transition: right 0.05s;">
+            <div class="pipe-top" style="width: 60px; height: 250px; position: absolute; background: #32CD32; top: 0; border-bottom-left-radius: 15px;"></div>
+            <div class="pipe-bottom" style="width: 60px; height: 300px; position: absolute; bottom: 0; border-top-left-radius: 15px; bottom: 0; left: 0;"></div>
+        </div>
+        <div class="pipe" id="pipe2" style="width: 60px; height: 300px; position: absolute; right: 300px; top: 100px;">
+            <div class="pipe-top" style="width: 60px; height: 150px; position: absolute; background: #32CD32; top: 0; border-bottom-left-radius: 15px;"></div>
+            <div class="pipe-bottom" style="width: 60px; height: 300px; position: absolute; bottom: 0; border-top-left-radius: 15px;"></div>
+        </div>
+        <div class="pipe" id="pipe3" style="width: 60px; height: 300px; position: absolute; right: 500px; top: 200px;">
+            <div class="pipe-top" style="width: 60px; height: 100px; position: absolute; background: #32CD32; top: 0; border-bottom-left-radius: 15px;"></div>
+            <div class="pipe-bottom" style="width: 60px; height: 300px; position: absolute; bottom: 0; border-top-left-radius: 15px;"></div>
+        </div>
+        <div class="cloud" id="cloud1" style="position: absolute; opacity: 0.8; left: 200px; top: 50px; width: 60px; height: 30px; transition: left 0.05s;"></div>
+        <div class="cloud" id="cloud2" style="position: absolute; opacity: 0.8; left: 500px; top: 150px; width: 50px; height: 25px; transition: left 0.05s;"></div>
+        <div class="cloud" id="cloud3" style="position: absolute; opacity: 0.8; left: 700px; top: 80px; width: 70px; height: 35px; transition: left 0.05s;"></div>
+    </div>
+
+</body>
+</html>
