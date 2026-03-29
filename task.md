@@ -1,6 +1,6 @@
 # project directory 
 
-* filename is : 'Qwen3.5-27B-Q6_K_50k'
+* filename is : 'Qwen3.5-27B-Q4_K_50k'
 
 * /home/neo/Desktop/flappy-birdZZZZs/
 
