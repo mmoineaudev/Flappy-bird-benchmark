@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Flappy Bird</title>
+    <style>
+        body {
+            margin: 0;
+            background: #202020;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            height: 100vh;
+            overflow: hidden;
+        }
+        canvas {
+            border: 2px solid #444;
+            background: #1a1a1a;
+        }
+    </style>
+</head>
+<body>
+    <canvas id="gameCanvas"></canvas>
+    <script>
+        /* --- CONFIGURATION --- */
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        // Game State
+        let bird = { x: 50, y: 200, w: 30, h: 30, vy: 0 };
+        let pipes = [];
+        let score = 0;
+        let highScore = 0;
+        let isPlaying = false;
+        let isPaused = false;
+        let lastTime = 0;
+        let speed = 3;
+
+        // UI Elements
+        const startBtn = document.createElement('button');
+        startBtn.innerHTML = 'Start Game';
+        startBtn.style.cssText = 'position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); padding: 15px 30px; font-size:20px; cursor:pointer;';
+        document.body.appendChild(startBtn);
+
+        /* --- HELPER FUNCTIONS --- */
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+
+        /* --- CORE GAME LOGIC --- */
+        function initGame() {
+            resize();
+            bird.y = canvas.height / 2;
+            bird.vy = 0;
+            pipes = [];
+            score = 0;
+            speed = 3;
+            pipeInterval = 150;
+            pipeWidth = 60;
+            pipeHeight = 100;
+            pipeGap = 150;
+            pipeSpeed = 3;
+        }
+
+        function update() {
+            if (isPaused) return;
+
+            // Bird physics
+            bird.vy += gravity;
+            bird.y += bird.vy;
+
+            // Wrap around
+            if (bird.y > canvas.height) bird.y = 0;
+            if (bird.y < 0) bird.y = canvas.height;
+
+            // Pipes
+            if (Math.random() > 0.98) pipes.push({
+                x: canvas.width,
+                y: Math.random() * (canvas.height - pipeGap),
+                width: pipeWidth,
+                height: pipeHeight
+            });
+
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                let p = pipes[i];
+                p.x -= pipeSpeed;
+
+                if (p.x < -p.width) pipes.splice(i, 1);
+
+                // Score
+                if (p.passed) {
+                    if (!p.passed) {
+                        score++;
+                        p.passed = true;
+                    }
+                }
+            }
+
+            // Collision
+            for (let p of pipes) {
+                if (bird.x < p.x + p.width && bird.x + bird.w > p.x &&
+                    bird.y < p.y + p.height && bird.y + bird.h > p.y) {
+                    gameOver();
+                }
+            }
+        }
+
+        function draw() {
+            ctx.fillStyle = '#1a1a1a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#2a2a2a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.fillStyle = '#4a4a4a';
+            ctx.fillRect(bird.x, bird.y, bird.w, bird.h);
+
+            ctx.fillStyle = '#2a2a2a';
+            for (let p of pipes) {
+                ctx.fillRect(p.x, p.y, p.width, p.height);
+            }
+        }
+
+        function loop() {
+            update();
+            draw();
+            requestAnimationFrame(loop);
+        }
+
+        /* --- INPUTS --- */
+        window.addEventListener('keydown', (e) => {
+            if (e.key === ' ') {
+                if (isPlaying) {
+                    isPaused = !isPaused;
+                    if (isPaused) {
+                        startBtn.style.display = 'block';
+                        startBtn.innerHTML = 'Resume';
+                    } else {
+                        startBtn.style.display = 'none';
+                    }
+                } else {
+                    isPlaying = true;
+                    isPaused = false;
+                    loop();
+                }
+            }
+        });
+
+        /* --- STARTUP --- */
+        initGame();
+        startBtn.onclick = () => {
+            if (!isPlaying) {
+                isPlaying = true;
+                loop();
+            } else {
+                isPaused = false;
+                loop();
+            }
+        };
+    </script>
+</body>
+</html>
