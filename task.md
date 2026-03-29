@@ -1,6 +1,6 @@
 # project directory 
 
-* filename is : 'GLM-4.7-Flash-Q6_K
+* filename is : 'Qwen3.5-27B-Q6_K'
 '
 * /home/neo/Desktop/flappy-birdZZZZs/
 
