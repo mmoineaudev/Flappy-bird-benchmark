@@ -1,0 +1,557 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Space Dodger</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #0a0a1a;
+            font-family: 'Courier New', monospace;
+        }
+        #game-container {
+            position: relative;
+            width: 960px;
+            height: 540px;
+            border: 4px solid #444;
+            border-radius: 8px;
+            overflow: hidden;
+            background: #000;
+            box-shadow: 0 0 50px rgba(100, 100, 255, 0.3);
+        }
+        canvas { display: block; }
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 48px;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 10px #00ffff, 2px 2px 4px rgba(0,0,0,0.5);
+            z-index: 10;
+        }
+        #multiplier {
+            position: absolute;
+            top: 70px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 24px;
+            color: #ff0;
+            text-shadow: 0 0 10px #ff0;
+        }
+        #start-screen, #game-over-screen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: rgba(0,0,0,0.7);
+            color: #fff;
+        }
+        #game-over-screen { display: none; }
+        h1 { font-size: 48px; margin-bottom: 20px; text-shadow: 0 0 20px #00ffff; color: #00ffff; }
+        p { font-size: 24px; margin-bottom: 10px; text-shadow: 0 0 10px rgba(0,255,255,0.5); }
+        .btn {
+            padding: 15px 40px;
+            font-size: 24px;
+            background: linear-gradient(180deg, #00ffff, #0088aa);
+            color: #000;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-family: 'Courier New', monospace;
+            transition: all 0.2s;
+            box-shadow: 0 0 20px rgba(0,255,255,0.5);
+        }
+        .btn:hover { transform: scale(1.1); box-shadow: 0 0 30px rgba(0,255,255,0.8); }
+        #high-score { font-size: 20px; color: #ff0; text-shadow: 0 0 10px #ff0; }
+        .difficulty {
+            margin-top: 20px;
+            font-size: 18px;
+            color: #aaa;
+        }
+    </style>
+</head>
+<body>
+    <div id="game-container">
+        <canvas id="game-canvas" width="960" height="540"></canvas>
+        <div id="score">0</div>
+        <div id="multiplier">x1</div>
+        <div id="start-screen">
+            <h1>🚀 Space Dodger</h1>
+            <p>Press SPACE or Click to Boost Up</p>
+            <p>Press ENTER to Start</p>
+            <button class="btn" onclick="startGame()">Launch Mission</button>
+            <p class="difficulty">Avoid asteroids • Collect stars • Survive!</p>
+        </div>
+        <div id="game-over-screen">
+            <h1>💥 Mission Failed!</h1>
+            <p id="final-score">Score: 0</p>
+            <p id="high-score">Best: 0</p>
+            <button class="btn" onclick="resetGame()">Re-launch</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('game-canvas');
+        const ctx = canvas.getContext('2d');
+        const scoreEl = document.getElementById('score');
+        const multiplierEl = document.getElementById('multiplier');
+        const startScreen = document.getElementById('start-screen');
+        const gameOverScreen = document.getElementById('game-over-screen');
+        const finalScoreEl = document.getElementById('final-score');
+        const highScoreEl = document.getElementById('high-score');
+
+        let gameRunning = false;
+        let score = 0;
+        let multiplier = 1;
+        let highScore = 0;
+        let frameCount = 0;
+        let particles = [];
+        let stars = [];
+        let flashAlpha = 0;
+
+        // Rocket player
+        const rocket = {
+            x: 100,
+            y: 270,
+            width: 40,
+            height: 50,
+            velocity: 0,
+            gravity: 0.4,
+            boostStrength: -10
+        };
+
+        // Asteroids
+        let asteroids = [];
+        const asteroidSpeed = 4;
+        const asteroidSpawnRate = 90;
+
+        // Collectible stars
+        let collectibles = [];
+        const collectibleSpawnRate = 200;
+
+        // Initialize starfield
+        function initStars() {
+            stars = [];
+            for (let i = 0; i < 100; i++) {
+                stars.push({
+                    x: Math.random() * canvas.width,
+                    y: Math.random() * canvas.height,
+                    size: Math.random() * 2 + 0.5,
+                    twinkle: Math.random() * Math.PI * 2
+                });
+            }
+        }
+
+        function drawStarfield() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#0a0a20');
+            gradient.addColorStop(0.5, '#1a1a40');
+            gradient.addColorStop(1, '#0a0a10');
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            stars.forEach(star => {
+                star.twinkle += 0.05;
+                const brightness = 0.5 + 0.5 * Math.sin(star.twinkle);
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.3 + brightness * 0.7})`;
+                ctx.beginPath();
+                ctx.arc(star.x, star.y, star.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+
+            // Moving stars (parallax)
+            for (let i = 0; i < 20; i++) {
+                const starX = ((frameCount * (i + 1) * 0.5) % (canvas.width + 50)) - 25;
+                const starY = 50 + i * 20;
+                ctx.fillStyle = `rgba(255, 255, 255, ${0.5 + Math.sin(frameCount * 0.1 + i) * 0.3})`;
+                ctx.beginPath();
+                ctx.arc(starX, starY, 1, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        function drawRocket() {
+            ctx.save();
+            ctx.translate(rocket.x + rocket.width/2, rocket.y + rocket.height/2);
+
+            // Rocket body
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.moveTo(0, -rocket.height/2);
+            ctx.lineTo(rocket.width/2, 0);
+            ctx.lineTo(rocket.width/2, rocket.height/2);
+            ctx.lineTo(-rocket.width/2, rocket.height/2);
+            ctx.lineTo(-rocket.width/2, 0);
+            ctx.closePath();
+            ctx.fill();
+
+            // Nose cone (red)
+            ctx.fillStyle = '#ff0055';
+            ctx.beginPath();
+            ctx.moveTo(0, -rocket.height/2);
+            ctx.lineTo(rocket.width/3, -rocket.height/4);
+            ctx.lineTo(-rocket.width/3, -rocket.height/4);
+            ctx.closePath();
+            ctx.fill();
+
+            // Window
+            ctx.fillStyle = '#88ccff';
+            ctx.beginPath();
+            ctx.arc(0, 0, 8, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Fins
+            ctx.fillStyle = '#ff6600';
+            ctx.beginPath();
+            ctx.moveTo(-rocket.width/2, rocket.height/2);
+            ctx.lineTo(-rocket.width/2 - 8, rocket.height/2 + 10);
+            ctx.lineTo(-rocket.width/2, rocket.height/2 + 5);
+            ctx.fill();
+
+            ctx.beginPath();
+            ctx.moveTo(rocket.width/2, rocket.height/2);
+            ctx.lineTo(rocket.width/2 + 8, rocket.height/2 + 10);
+            ctx.lineTo(rocket.width/2, rocket.height/2 + 5);
+            ctx.fill();
+
+            ctx.restore();
+
+            // Engine flame
+            if (gameRunning) {
+                ctx.fillStyle = `rgba(255, ${150 + Math.random() * 100}, 0, 0.8)`;
+                const flameHeight = 15 + Math.random() * 10;
+                ctx.beginPath();
+                ctx.moveTo(-rocket.width/4, rocket.height/2);
+                ctx.lineTo(0, rocket.height/2 + flameHeight);
+                ctx.lineTo(rocket.width/4, rocket.height/2);
+                ctx.closePath();
+                ctx.fill();
+            }
+        }
+
+        function drawAsteroids() {
+            asteroids.forEach(asteroid => {
+                ctx.save();
+                ctx.translate(asteroid.x + asteroid.width/2, asteroid.y + asteroid.height/2);
+                ctx.rotate(asteroid.rotation);
+
+                // Asteroid body
+                ctx.fillStyle = '#887766';
+                ctx.strokeStyle = '#554433';
+                ctx.lineWidth = 2;
+
+                ctx.beginPath();
+                const points = asteroid.points || [];
+                if (points.length > 0) {
+                    ctx.moveTo(points[0].x, points[0].y);
+                    for (let i = 1; i < points.length; i++) {
+                        ctx.lineTo(points[i].x, points[i].y);
+                    }
+                    ctx.closePath();
+                } else {
+                    ctx.arc(0, 0, asteroid.width/2, 0, Math.PI * 2);
+                }
+                ctx.fill();
+                ctx.stroke();
+
+                // Craters
+                ctx.fillStyle = 'rgba(0,0,0,0.3)';
+                ctx.beginPath();
+                ctx.arc(-5, -3, 3, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(4, 2, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.restore();
+            });
+        }
+
+        function drawCollectibles() {
+            collectibles.forEach(collectible => {
+                ctx.save();
+                ctx.translate(collectible.x + collectible.width/2, collectible.y + collectible.height/2);
+
+                // Star shape
+                ctx.fillStyle = '#ffd700';
+                ctx.shadowColor = '#ffd700';
+                ctx.shadowBlur = 15;
+
+                ctx.beginPath();
+                for (let i = 0; i < 5; i++) {
+                    const angle = (i * Math.PI * 2 / 5) - Math.PI / 2;
+                    const x = Math.cos(angle) * collectible.width/2;
+                    const y = Math.sin(angle) * collectible.height/2;
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+
+                    const innerAngle = angle + Math.PI / 2;
+                    const ix = Math.cos(innerAngle) * collectible.width/4;
+                    const iy = Math.sin(innerAngle) * collectible.height/4;
+                    ctx.lineTo(ix, iy);
+                }
+                ctx.closePath();
+                ctx.fill();
+
+                ctx.restore();
+            });
+        }
+
+        function createParticles(x, y, color, count) {
+            for (let i = 0; i < count; i++) {
+                particles.push({
+                    x: x,
+                    y: y,
+                    vx: (Math.random() - 0.5) * 8,
+                    vy: (Math.random() - 0.5) * 8,
+                    life: 1,
+                    color: color,
+                    size: Math.random() * 4 + 2
+                });
+            }
+        }
+
+        function drawParticles() {
+            particles = particles.filter(p => p.life > 0);
+            particles.forEach(p => {
+                ctx.globalAlpha = p.life;
+                ctx.fillStyle = p.color;
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.globalAlpha = 1;
+
+                p.x += p.vx;
+                p.y += p.vy;
+                p.life -= 0.02;
+            });
+        }
+
+        function drawFlash() {
+            if (flashAlpha > 0) {
+                ctx.fillStyle = `rgba(255, 255, 255, ${flashAlpha})`;
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                flashAlpha -= 0.05;
+            }
+        }
+
+        function updateRocket() {
+            rocket.velocity += rocket.gravity;
+            rocket.y += rocket.velocity;
+
+            // Floor collision
+            if (rocket.y + rocket.height >= canvas.height) {
+                gameOver();
+            }
+
+            // Ceiling collision
+            if (rocket.y < 0) {
+                rocket.y = 0;
+                rocket.velocity = 0;
+            }
+
+            // Thruster particles
+            if (frameCount % 3 === 0) {
+                createParticles(rocket.x + rocket.width/2, rocket.y + rocket.height, '#ff8800', 2);
+            }
+        }
+
+        function updateAsteroids() {
+            if (frameCount % asteroidSpawnRate === 0) {
+                const asteroidY = Math.random() * (canvas.height - 80) + 40;
+                const width = Math.random() * 40 + 40;
+                const height = Math.random() * 40 + 40;
+
+                // Generate irregular shape
+                const points = [];
+                const numPoints = 6;
+                for (let i = 0; i < numPoints; i++) {
+                    const angle = (i / numPoints) * Math.PI * 2;
+                    const r = Math.random() * 10 + width/3;
+                    points.push({
+                        x: Math.cos(angle) * r,
+                        y: Math.sin(angle) * r
+                    });
+                }
+
+                asteroids.push({
+                    x: canvas.width,
+                    y: asteroidY - height/2,
+                    width: width,
+                    height: height,
+                    rotation: 0,
+                    rotSpeed: (Math.random() - 0.5) * 0.1,
+                    points: points,
+                    passed: false
+                });
+            }
+
+            asteroids.forEach(asteroid => {
+                asteroid.x -= asteroidSpeed;
+                asteroid.rotation += asteroid.rotSpeed;
+
+                // Collision detection
+                if (rocket.x + rocket.width > asteroid.x &&
+                    rocket.x < asteroid.x + asteroid.width &&
+                    rocket.y + rocket.height > asteroid.y &&
+                    rocket.y < asteroid.y + asteroid.height) {
+                    createParticles(rocket.x + rocket.width/2, rocket.y + rocket.height/2, '#ff0055', 30);
+                    gameOver();
+                }
+
+                if (!asteroid.passed && rocket.x > asteroid.x + asteroid.width) {
+                    asteroid.passed = true;
+                    score += multiplier;
+                    scoreEl.textContent = score;
+
+                    // Increase multiplier every 5 asteroids
+                    if (score % 5 === 0 && multiplier < 5) {
+                        multiplier++;
+                        multiplierEl.textContent = `x${multiplier}`;
+                        flashAlpha = 0.3;
+                    }
+                }
+            });
+
+            asteroids = asteroids.filter(a => a.x + a.width > 0);
+        }
+
+        function updateCollectibles() {
+            if (frameCount % collectibleSpawnRate === 0) {
+                const collectibleY = Math.random() * (canvas.height - 60) + 30;
+                collectibles.push({
+                    x: canvas.width,
+                    y: collectibleY,
+                    width: 30,
+                    height: 30,
+                    collected: false
+                });
+            }
+
+            collectibles.forEach(c => {
+                c.x -= asteroidSpeed;
+
+                // Collection detection
+                if (!c.collected &&
+                    rocket.x + rocket.width > c.x &&
+                    rocket.x < c.x + c.width &&
+                    rocket.y + rocket.height > c.y &&
+                    rocket.y < c.y + c.height) {
+                    c.collected = true;
+                    score += 10 * multiplier;
+                    scoreEl.textContent = score;
+                    createParticles(c.x + c.width/2, c.y + c.height/2, '#ffd700', 15);
+                }
+            });
+
+            collectibles = collectibles.filter(c => !c.collected && c.x + c.width > 0);
+        }
+
+        function boost() {
+            if (!gameRunning) return;
+            rocket.velocity = rocket.boostStrength;
+            createParticles(rocket.x + rocket.width/2, rocket.y + rocket.height, '#00ffff', 5);
+        }
+
+        function update() {
+            if (!gameRunning) return;
+            frameCount++;
+            updateRocket();
+            updateAsteroids();
+            updateCollectibles();
+            draw();
+            requestAnimationFrame(update);
+        }
+
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawStarfield();
+            drawAsteroids();
+            drawCollectibles();
+            drawRocket();
+            drawParticles();
+            drawFlash();
+        }
+
+        function startGame() {
+            startScreen.style.display = 'none';
+            resetGameVariables();
+            gameRunning = true;
+            draw();
+            update();
+        }
+
+        function resetGame() {
+            gameOverScreen.style.display = 'none';
+            resetGameVariables();
+            gameRunning = true;
+            draw();
+            update();
+        }
+
+        function resetGameVariables() {
+            rocket.y = 270;
+            rocket.velocity = 0;
+            asteroids = [];
+            collectibles = [];
+            particles = [];
+            score = 0;
+            multiplier = 1;
+            frameCount = 0;
+            flashAlpha = 0;
+            scoreEl.textContent = '0';
+            multiplierEl.textContent = 'x1';
+        }
+
+        function gameOver() {
+            gameRunning = false;
+            if (score > highScore) {
+                highScore = score;
+            }
+            finalScoreEl.textContent = `Score: ${score}`;
+            highScoreEl.textContent = `Best: ${highScore}`;
+            gameOverScreen.style.display = 'flex';
+        }
+
+        // Input handlers
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' || e.code === 'ArrowUp') {
+                if (gameRunning) {
+                    boost();
+                } else if (startScreen.style.display !== 'none') {
+                    startGame();
+                }
+            }
+            if (e.code === 'Enter') {
+                if (startScreen.style.display !== 'none') {
+                    startGame();
+                } else if (gameOverScreen.style.display !== 'none') {
+                    resetGame();
+                }
+            }
+        });
+
+        canvas.addEventListener('click', () => {
+            if (gameRunning) {
+                boost();
+            }
+        });
+
+        // Initialize
+        initStars();
+        draw();
+    </script>
+</body>
+</html>

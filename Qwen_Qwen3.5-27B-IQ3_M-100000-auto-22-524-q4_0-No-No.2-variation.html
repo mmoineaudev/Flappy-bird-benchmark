@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Flappy Bird - Neon Variation</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{margin:0;background:#0a0a1a;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:'Courier New',monospace}
+#game{width:1280px;height:720px;background:linear-gradient(to bottom,#1a0a2e 0%,#0a1a2e 50%,#0a0a1a 100%);overflow:hidden;position:relative;border:4px solid #00ffff;box-shadow:0 0 50px rgba(0,255,255,0.3);border-radius:10px}
+.bird{position:absolute;width:35px;height:35px;background:#fff;border-radius:50%;box-shadow:0 0 30px #ff00ff,0 0 60px #ff00ff,inset 0 0 20px #fff;animation:thrust 0.1s infinite alternate}
+@keyframes thrust{0%{box-shadow:0 0 30px #ff00ff,0 0 60px #ff00ff,inset 0 0 20px #fff}100%{box-shadow:0 0 40px #ff00ff,0 0 80px #ff00ff,inset 0 0 30px #fff}}
+.bird:after{content:'';position:absolute;right:-5px;width:20px;height:20px;background:radial-gradient(circle,#fff 0%,#ff00ff 70%,transparent 100%);border-radius:50%;animation:jet 0.2s infinite}
+@keyframes jet{0%{opacity:1;transform:scale(1)}100%{opacity:0.5;transform:scale(1.3)}}
+.trail{position:absolute;width:10px;height:10px;background:radial-gradient(circle,#fff 0%,#ff00ff 50%,transparent 100%);border-radius:50%;opacity:0.8;pointer-events:none}
+.pipe{position:absolute;width:70px;background:linear-gradient(to right,#000 0%,#00aa00 20%,#00ff00 50%,#00aa00 80%,#000 100%);border:2px solid #00ff00;box-shadow:0 0 20px #00ff00,inset 0 0 20px #00ff00}
+.pipe-left{border-radius:8px 0 0 8px}
+.cloud{position:absolute;background:radial-gradient(ellipse,#ffffff33 0%,transparent 70%);border-radius:50%;opacity:0.3;animation:float 20s linear infinite}
+.ground{position:absolute;bottom:0;left:0;width:100%;height:80px;background:linear-gradient(to bottom,#1a1a1a 0%,#0a0a0a 100%);border-top:3px solid #00ff00;box-shadow:0 0 30px #00ff00}
+.ground:before{content:'';position:absolute;top:0;left:0;width:100%;height:30px;background:repeating-linear-gradient(90deg,#00ff00 0px,#00ff00 2px,#000 2px,#000 40px);opacity:0.5}
+.score{position:absolute;top:30px;left:50%;transform:translateX(-50%);font-size:56px;font-weight:bold;color:#fff;text-shadow:0 0 30px #00ffff,0 0 60px #00ffff;pointer-events:none;z-index:100;letter-spacing:10px}
+.score span{color:#ff00ff;text-shadow:0 0 30px #ff00ff,0 0 60px #ff00ff}
+.game-over{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,20,0.95);color:#fff;padding:50px 80px;border-radius:15px;text-align:center;display:none;z-index:200;border:2px solid #ff00ff;box-shadow:0 0 50px #ff00ff,inset 0 0 50px rgba(255,0,255,0.2)}
+.game-over h2{font-size:48px;margin-bottom:20px;color:#ff00ff;text-shadow:0 0 30px #ff00ff;animation:glow 1s ease-in-out infinite alternate}@keyframes glow{0%{text-shadow:0 0 30px #ff00ff}100%{text-shadow:0 0 50px #ff00ff,0 0 80px #ff00ff}}
+.game-over p{font-size:28px;margin:15px 0;color:#00ff00;text-shadow:0 0 20px #00ff00}
+.btn{display:inline-block;margin-top:30px;padding:20px 60px;background:linear-gradient(135deg,#ff00ff 0%,#aa00aa 100%);color:#fff;font-size:24px;font-weight:bold;border:2px solid #ff00ff;border-radius:10px;cursor:pointer;text-decoration:none;transition:all 0.3s;box-shadow:0 0 30px #ff00ff}.btn:hover{transform:scale(1.1);box-shadow:0 0 50px #ff00ff,0 0 80px #ff00ff}
+.shake{animation:shake 0.3s ease-in-out}@keyframes shake{0%,100%{transform:translateX(0)}10%,30%,50%,70%,90%{transform:translateX(-5px)}20%,40%,60%,80%{transform:translateX(5px)}}
+</style></head><body>
+<div id="game"><div class="score" id="score"><span>0</span></div><div class="game-over" id="gameOver"><h2>GAME OVER</h2><p>Score: <span id="finalScore">0</span></p><p>Best: <span id="bestScore">0</span></p><button class="btn" onclick="resetGame()">RESTART</button></div></div>
+<script>
+const game=document.getElementById('game'),bird=document.createElement('div'),scoreEl=document.getElementById('score'),gameOverEl=document.getElementById('gameOver');
+bird.className='bird';bird.style.left='100px';bird.style.top='300px';game.appendChild(bird);
+let gravity=0.6,velocity=0,jumpStrength=-11,pipeSpeed=4,pipeGap=230,pipeTimer=0,score=0,best=localStorage.getItem('flappyNeonBest')||0,running=true,interval,trails=[];
+for(let i=0;i<8;i++){let c=document.createElement('div');c.className='cloud';c.style.left=Math.random()*1280+'px';c.style.top=Math.random()*400+'px';c.style.width=(50+Math.random()*100)+'px';c.style.height=(30+Math.random()*50)+'px';game.appendChild(c)}
+function createPipe(){const pipeH=Math.random()*(game.clientHeight-150-pipeGap-50)+30;const top=document.createElement('div');top.className='pipe pipe-left';top.style.height=pipeH+'px';top.style.top='0';top.style.left='950px';game.appendChild(top);const bot=document.createElement('div');bot.className='pipe pipe-left';bot.style.height=(game.clientHeight-150-pipeGap-pipeH)+'px';bot.style.top=(pipeH+pipeGap)+'px';bot.style.left='950px';game.appendChild(bot);return{top,bot,h:pipeH};}
+function createTrail(){const t=document.createElement('div');t.className='trail';t.style.left=(parseFloat(bird.style.left)+10)+'px';t.style.top=(parseFloat(bird.style.top)+10)+'px';t.style.width=(5+Math.random()*10)+'px';t.style.height=t.style.width;game.appendChild(t);trails.push(t);if(trails.length>15){game.removeChild(trails[0]);trails.shift()}}
+function update(){if(!running)return;bird.style.top=(parseFloat(bird.style.top)+velocity)+'px';velocity+=gravity;if(velocity>0){bird.style.transform='rotate('+Math.min(velocity*5,90)+'deg)'}else{bird.style.transform='rotate('+Math.max(velocity*5,-25)+'deg)'}
+pipeTimer++;if(pipeTimer%Math.max(45,100-Math.floor(score/3))==0){pipes.push(createPipe());score++;scoreEl.innerHTML='<span>'+score+'</span>'}
+createTrail();trails.forEach((t,i)=>{t.style.opacity=0.5-i/trails.length*0.5;t.style.left=(parseFloat(t.style.left)-pipeSpeed)+'px';if(i>0&&i%2==0)t.style.left=(parseFloat(t.style.left)-pipeSpeed-1)+'px'})
+pipes.forEach((p,i)=>{p.top.style.left=(950-i*(60+pipeSpeed*0.2))+'px';p.bot.style.left=(950-i*(60+pipeSpeed*0.2))+'px';if(p.top.getBoundingClientRect().right>bird.getBoundingClientRect().left&&p.top.getBoundingClientRect().left<bird.getBoundingClientRect().right&&(bird.getBoundingClientRect().top<p.top.getBoundingClientRect().top+25||bird.getBoundingClientRect().bottom>p.bot.getBoundingClientRect().top+60)){endGame()}})
+if(parseInt(bird.style.top)>game.clientHeight-115){endGame()}}
+function jump(){if(!running)return;velocity=jumpStrength;for(let i=0;i<5;i++){let p=document.createElement('div');p.style.position='absolute';p.style.left=bird.getBoundingClientRect().left+'px';p.style.top=bird.getBoundingClientRect().top+'px';p.style.width='5px';p.style.height='5px';p.style.background='#fff';p.style.borderRadius='50%';p.style.pointerEvents='none';game.appendChild(p);setTimeout(()=>p.remove(),100*i)}}
+function endGame(){running=false;clearInterval(interval);game.classList.add('shake');gameOverEl.style.display='block';document.getElementById('finalScore').textContent=score;const b=Math.max(score,best);localStorage.setItem('flappyNeonBest',b);document.getElementById('bestScore').textContent=b;setTimeout(()=>game.classList.remove('shake'),300)}
+function resetGame(){gameOverEl.style.display='none';bird.style.top='300px';velocity=0;score=0;scoreEl.innerHTML='<span>0</span>';pipes.forEach(p=>{game.removeChild(p.top);game.removeChild(p.bot)});pipes=[];trails.forEach(t=>game.removeChild(t));trails=[];running=true;pipeSpeed=4;interval=setInterval(update,1000/60)}
+let pipes=[];
+game.addEventListener('keydown',e=>{if(e.code=='Space'){e.preventDefault();jump();}});
+game.addEventListener('click',()=>jump());
+game.addEventListener('touchstart',e=>{e.preventDefault();jump()});
+resetGame();
+</script></body></html>

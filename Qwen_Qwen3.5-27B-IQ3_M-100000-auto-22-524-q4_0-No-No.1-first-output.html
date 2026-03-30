@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Flappy Bird - Version 1</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}body{margin:0;background:#1a1a2e;display:flex;justify-content:center;align-items:center;height:100vh;overflow:hidden;font-family:monospace}
+#game{width:1280px;height:720px;background:linear-gradient(to bottom,#87CEEB 0%,#87CEEB 50%,#90EE90 50%,#90EE90 100%);overflow:hidden;position:relative;border:4px solid #333;box-shadow:0 0 20px rgba(0,0,0,0.5)}
+.bird{position:absolute;width:30px;height:30px;background:#FFD700;border-radius:50%;border:3px solid #B8860B;box-shadow:inset -5px -5px 10px rgba(0,0,0,0.2)}
+.bird:before{content:'';position:absolute;top:-5px;right:-3px;width:0;height:0;border:8px solid transparent;border-bottom-color:#FF6B6B;border-right-color:transparent;transform:rotate(45deg)}
+.bird:after{content:'';position:absolute;bottom:5px;left:5px;width:8px;height:8px;background:#fff;border-radius:50%;box-shadow:inset -1px -1px 2px rgba(0,0,0,0.3)}
+.pipe{position:absolute;width:60px;background:linear-gradient(to right,#228B22 0%,#32CD32 20%,#228B22 100%);border:3px solid #006400;border-radius:5px}
+.pipe-left{border-radius:5px 0 0 5px}
+.ground{position:absolute;bottom:0;left:0;width:100%;height:80px;background:linear-gradient(to bottom,#8B4513 0%,#654321 100%);border-top:4px solid #228B22}
+.ground:before{content:'';position:absolute;top:0;left:0;width:100%;height:20px;background:repeating-linear-gradient(45deg,#90EE90,#90EE90 10px,#228B22 10px,#228B22 20px)}
+.score{position:absolute;top:20px;left:50%;transform:translateX(-50%);font-size:48px;font-weight:bold;color:#fff;text-shadow:3px 3px 0 #000;pointer-events:none;z-index:100}
+.game-over{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:rgba(0,0,0,0.8);color:#fff;padding:40px 60px;border-radius:10px;text-align:center;display:none;z-index:200}
+.game-over h2{font-size:36px;margin-bottom:20px;color:#FFD700}
+.game-over p{font-size:24px;margin:10px 0}
+.btn{display:inline-block;margin-top:20px;padding:15px 40px;background:#FFD700;color:#000;font-size:20px;font-weight:bold;border:none;border-radius:5px;cursor:pointer;text-decoration:none}
+.btn:hover{background:#FFA500}
+</style></head><body>
+<div id="game"><div class="score" id="score">0</div><div class="game-over" id="gameOver"><h2>GAME OVER</h2><p>Score: <span id="finalScore">0</span></p><p>Best: <span id="bestScore">0</span></p><button class="btn" onclick="resetGame()">Play Again</button></div></div>
+<script>
+const game=document.getElementById('game'),bird=document.createElement('div'),scoreEl=document.getElementById('score'),gameOverEl=document.getElementById('gameOver');
+bird.className='bird';bird.style.left='100px';bird.style.top='300px';game.appendChild(bird);
+let gravity=0.5,velocity=0,jumpStrength=-10,pipeSpeed=3,pipeGap=220,pipeTimer=0,score=0,best=localStorage.getItem('flappyBest')||0,running=true,interval;
+function createPipe(){const pipeH=Math.random()*(game.clientHeight-100-pipeGap-50)+25;const top=document.createElement('div');top.className='pipe pipe-left';top.style.height=pipeH+'px';top.style.top='0';top.style.left='900px';game.appendChild(top);const bot=document.createElement('div');bot.className='pipe pipe-left';bot.style.height=(game.clientHeight-100-pipeGap-pipeH)+'px';bot.style.top=(pipeH+pipeGap)+'px';bot.style.left='900px';game.appendChild(bot);return{top,bot,h:pipeH};}
+function update(){if(!running)return;bird.style.top=(parseFloat(bird.style.top)+velocity)+'px';velocity+=gravity;pipeTimer++;if(pipeTimer%90==0)pipes.push(createPipe());pipes.forEach((p,i)=>{p.top.style.left=(900-i*60)+'px';p.bot.style.left=(900-i*60)+'px';if(p.top.getBoundingClientRect().right>bird.getBoundingClientRect().left&&p.top.getBoundingClientRect().left<bird.getBoundingClientRect().right&&(bird.getBoundingClientRect().top<p.top.getBoundingClientRect().top+30||bird.getBoundingClientRect().bottom>p.bot.getBoundingClientRect().top+60)){endGame();}});if(parseInt(bird.style.top)>game.clientHeight-110){endGame();}}
+function jump(){if(!running)return;velocity=jumpStrength;}
+function endGame(){running=false;clearInterval(interval);gameOverEl.style.display='block';document.getElementById('finalScore').textContent=score;const b=Math.max(score,best);localStorage.setItem('flappyBest',b);document.getElementById('bestScore').textContent=b;}
+function resetGame(){gameOverEl.style.display='none';bird.style.top='300px';velocity=0;score=0;scoreEl.textContent='0';pipes=[];running=true;interval=setInterval(update,1000/60);}
+let pipes=[];
+game.addEventListener('keydown',e=>{if(e.code=='Space'){e.preventDefault();jump();}});
+game.addEventListener('click',()=>jump());
+resetGame();
+</script></body></html>
