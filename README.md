@@ -1,103 +1,71 @@
-# Cosmic Flap - Three Iterations
+# Flappy Bird Variations
 
-## Overview
-Three progressively enhanced versions of a Flappy Bird-style game, each building on the last with new features, mechanics, and visual polish.
+Three unique flappy bird implementations, each with distinct aesthetics and gameplay features.
 
----
+## Files
 
-## Version 1: `Qwen3.5-27B-Q4_K_S_50k2.1-first-output.html`
-**Theme:** Classic Flappy Bird with clean aesthetics
+### 1. Qwen3.5-27B-Q4_K_S_70k.1-first-output.html
+**Classic Flappy Bird**
 
-### Features
-- Basic bird physics (gravity, jump, rotation)
-- Pipe obstacles with random heights
-- Score tracking with local storage best score
-- Animated clouds background
-- Ground scroll effect
-- Collision detection
-- Start and game-over screens
+A clean, pleasant implementation with traditional flappy bird mechanics.
 
-### Visual Style
-- Sky blue gradient background
-- Simple cartoon bird with eye, wing, and beak
-- Green pipes with caps
-- Clean UI with blue/white color scheme
+**Features:**
+- Classic bird character with smooth rotation
+- Green pipe obstacles with gradient shading
+- Animated cloud background
+- Score tracking with local storage (best score)
+- Clean sky gradient background
+- Simple, polished gameplay
+
+**Controls:** Space or click to jump
 
 ---
 
-## Version 2: `Qwen3.5-27B-Q4_K_S_50k2.2-variation.html`
-**Theme:** Neon Flap - Cyberpunk Edition
+### 2. Qwen3.5-27B-Q4_K_S_70k.2-variation.html  
+**Neon Flap - Cyberpunk Edition**
 
-### New Features Over V1
-- **Particle System:** Jump trails, score bursts, collision effects
-- **Combo System:** Consecutive scores build multiplier (up to 5x bonus)
-- **Power-ups:** Three types - Shield, Slow Motion, 2x Score
-- **Dynamic Difficulty:** Pipe speed increases with score
-- **Sound Effects:** Web Audio API - jump, score, powerup, crash sounds
-- **Neon Visuals:** Glowing effects, cyan/magenta color palette
-- **Bird Trail:** Visual trail following the bird
-- **Diamond Power-ups:** Collectible items between pipes
+A futuristic neon-styled version with power-ups and enhanced visuals.
 
-### Visual Style
-- Dark background with neon cyan/magenta accents
-- Glowing pipes and bird with shadow effects
-- Cyberpunk grid floor
-- Pulsing animations on UI elements
+**Features:**
+- Neon/cyberpunk aesthetic with glow effects
+- Particle effects on jumps and collections
+- **Combo system:** Consecutive pipes increase score multiplier
+- **Speed boosters:** Collectible power-ups that speed up gameplay and increase gap size
+- Animated starfield background
+- Grid overlay for retro-futuristic feel
+- Visual pulse effects on collectibles
+
+**Controls:** Space or click to jump
 
 ---
 
-## Version 3: `Qwen3.5-27B-Q4_K_S_50k2.3-variation.html`
-**Theme:** Cosmic Flap - Space Adventure
+### 3. Qwen3.5-27B-Q4_K_S_70k.3-variation.html
+**Flying Kitty - Kawaii Adventure**
 
-### New Features Over V2
-- **Unlockable Skins:** 5 ship skins (Classic, Golden, Crystal, Plasma, Void)
-- **Boss Pipes:** Every 10 points - slower, worth 5x points, hazard stripes
-- **Day/Night Cycle:** Dynamic background gradient that cycles through sunset/night
-- **Starfield Background:** 100 twinkling stars
-- **Turbo Mode:** Hold space to fall faster (with flame effect)
-- **Screen Shake:** Impact feedback on collision
-- **Floating Score Text:** Animated +1, +2 popups
-- **Multiplier Display:** Visual score multiplier tracking
-- **Menu System:** Skin selection screen with unlock requirements
+A cute anime-inspired version with customization and achievements.
 
-### Visual Style
-- Space theme with gradient skyboxes
-- Starfield with parallax twinkling
-- Rocket ship bird with engine flame
-- Boss pipes with animated red/black hazard stripes
-- More varied particle effects (sparkles, explosions)
+**Features:**
+- **4 bird skins** to choose from (yellow, pink, blue, green)
+- **4 theme modes:** Day, Night, Sunset, Rainbow
+- **Achievement system:** Unlock milestones at 10, 25, 50, 100 points
+- **Collectible stars:** Bonus points scattered between pipes
+- Cute kitty character with animated wings and tail
+- Blush cheeks and detailed kawaii art style
+- Floating heart animations on achievements
+
+**Controls:** Space or click to jump
 
 ---
 
 ## Key Differences Summary
 
-| Feature | V1 | V2 | V3 |
-|---------|----|----|----|
-| Theme | Classic | Cyberpunk | Space |
-| Particles | No | Yes | Advanced |
-| Sound | No | Yes | Yes |
-| Power-ups | No | Yes (3 types) | Yes (3 types) |
-| Combo System | No | Yes | Yes |
-| Difficulty Scaling | No | Yes | Yes |
-| Boss Pipes | No | No | Yes |
-| Skins | No | No | 5 unlockable |
-| Day/Night Cycle | No | No | Yes |
-| Turbo Mode | No | No | Yes |
-| Screen Shake | No | No | Yes |
-| Starfield | No | No | Yes |
-
----
-
-## How to Play
-1. Open any HTML file in a browser
-2. Press SPACE or click to jump
-3. Avoid pipes by timing your jumps
-4. Collect power-ups for bonuses
-5. In V3: Hold SPACE for turbo fall, unlock skins by scoring high
-
----
-
-## Files Created
-- `Qwen3.5-27B-Q4_K_S_50k2.1-first-output.html` - Base version
-- `Qwen3.5-27B-Q4_K_S_50k2.2-variation.html` - Cyberpunk variation
-- `Qwen3.5-27B-Q4_K_S_50k2.3-variation.html` - Space adventure variation
+| Feature | Version 1 | Version 2 | Version 3 |
+|---------|-----------|-----------|-----------|
+| Theme | Classic | Cyberpunk/Neon | Kawaii/Anime |
+| Character | Bird | Neon bird | Cute kitty |
+| Visual Effects | Simple gradients | Glow, particles | Animations, hearts |
+| Power-ups | None | Speed boosters | Collectible stars |
+| Score System | Basic | Combo multiplier | Basic + bonuses |
+| Customization | None | None | Skins + themes |
+| Progression | Best score | Best score | Achievements |
+| Background | Clouds | Stars + grid | Clouds + sun |

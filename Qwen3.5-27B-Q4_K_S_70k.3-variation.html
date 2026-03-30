@@ -1,0 +1,706 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flying Kitty - Kawaii Adventure</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #ffecd2 0%, #fcb69f 50%, #ffecd2 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 10px 40px rgba(255, 100, 100, 0.3);
+            border-radius: 20px;
+            overflow: hidden;
+            border: 8px solid #fff;
+        }
+        canvas {
+            display: block;
+            border-radius: 12px;
+        }
+        #startScreen, #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            z-index: 10;
+        }
+        #startScreen h1 {
+            font-size: 52px;
+            margin-bottom: 15px;
+            color: #ff6b9d;
+            text-shadow: 3px 3px 0 #ffe5ec, 5px 5px 0 rgba(0,0,0,0.1);
+            letter-spacing: 2px;
+        }
+        #startScreen p, #gameOverScreen p {
+            font-size: 18px;
+            margin-bottom: 12px;
+            color: #666;
+        }
+        .skin-selector {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        .skin-btn {
+            width: 50px;
+            height: 50px;
+            border: 3px solid #ff6b9d;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: all 0.3s;
+            background: white;
+        }
+        .skin-btn:hover, .skin-btn.active {
+            transform: scale(1.15);
+            box-shadow: 0 5px 20px rgba(255, 107, 157, 0.4);
+        }
+        #startScreen button, #gameOverScreen button {
+            padding: 15px 50px;
+            font-size: 22px;
+            background: linear-gradient(45deg, #ff6b9d, #ff9a8b);
+            border: none;
+            border-radius: 25px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(255, 107, 157, 0.4);
+        }
+        #startScreen button:hover, #gameOverScreen button:hover {
+            transform: translateY(-3px) scale(1.05);
+            box-shadow: 0 8px 25px rgba(255, 107, 157, 0.6);
+        }
+        #score {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 52px;
+            color: #ff6b9d;
+            text-shadow: 2px 2px 0 #ffe5ec;
+            z-index: 5;
+        }
+        #themeBtn {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            padding: 10px 15px;
+            font-size: 14px;
+            background: white;
+            border: 2px solid #ff6b9d;
+            border-radius: 20px;
+            cursor: pointer;
+            color: #ff6b9d;
+            z-index: 10;
+            transition: all 0.3s;
+        }
+        #themeBtn:hover {
+            background: #ff6b9d;
+            color: white;
+        }
+        .hidden {
+            display: none !important;
+        }
+        #bestScore {
+            font-size: 16px;
+            color: #999;
+        }
+        #achievements {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            gap: 8px;
+            z-index: 10;
+        }
+        .achievement {
+            width: 36px;
+            height: 36px;
+            background: #ccc;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            opacity: 0.3;
+            transition: all 0.5s;
+        }
+        .achievement.unlocked {
+            background: #ffd93d;
+            opacity: 1;
+            transform: scale(1.2);
+            box-shadow: 0 3px 10px rgba(255, 217, 61, 0.5);
+        }
+        .hearts {
+            position: absolute;
+            font-size: 20px;
+            animation: floatUp 1s ease-out forwards;
+            pointer-events: none;
+        }
+        @keyframes floatUp {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-50px) scale(1.5); }
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="800" height="450"></canvas>
+        <div id="achievements">
+            <div class="achievement" id="ach1" title="Score 10">10</div>
+            <div class="achievement" id="ach2" title="Score 25">25</div>
+            <div class="achievement" id="ach3" title="Score 50">50</div>
+            <div class="achievement" id="ach4" title="Score 100">100</div>
+        </div>
+        <div id="score" class="hidden">0</div>
+        <button id="themeBtn">Day ☀️</button>
+        <div id="startScreen">
+            <h1>🐱 Flying Kitty 🐱</h1>
+            <div class="skin-selector">
+                <button class="skin-btn active" style="background: #ffd93d;" onclick="selectSkin(0)"></button>
+                <button class="skin-btn" style="background: #ff6b9d;" onclick="selectSkin(1)"></button>
+                <button class="skin-btn" style="background: #6bc2ff;" onclick="selectSkin(2)"></button>
+                <button class="skin-btn" style="background: #c2ff6b;" onclick="selectSkin(3)"></button>
+            </div>
+            <p>Press SPACE or Click to Fly</p>
+            <p style="font-size: 14px;">Collect stars for bonus points!</p>
+            <button id="startBtn">PLAY</button>
+        </div>
+        <div id="gameOverScreen" class="hidden">
+            <h1 style="font-size: 40px; color: #ff6b9d;">Oops!</h1>
+            <p id="finalScore" style="font-size: 24px;">Score: 0</p>
+            <p id="bestScore">Best: 0</p>
+            <button id="restartBtn">TRY AGAIN</button>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        const startScreen = document.getElementById('startScreen');
+        const gameOverScreen = document.getElementById('gameOverScreen');
+        const scoreDisplay = document.getElementById('score');
+        const themeBtn = document.getElementById('themeBtn');
+        const finalScoreEl = document.getElementById('finalScore');
+        const bestScoreEl = document.getElementById('bestScore');
+        const startBtn = document.getElementById('startBtn');
+        const restartBtn = document.getElementById('restartBtn');
+        
+        let gameRunning = false;
+        let score = 0;
+        let bestScore = localStorage.getItem('flyingKittyBest') || 0;
+        let animationId;
+        let selectedSkin = 0;
+        let currentTheme = 'day';
+        
+        const themes = {
+            day: {
+                bg1: '#87CEEB', bg2: '#E0F6FF', ground: '#8B7355', grass: '#90EE90',
+                cloudColor: 'rgba(255, 255, 255, 0.8)', sunColor: '#FFD700'
+            },
+            night: {
+                bg1: '#1a1a3e', bg2: '#16213e', ground: '#4a4a6a', grass: '#2d5a27',
+                cloudColor: 'rgba(100, 100, 150, 0.4)', sunColor: '#FFD700'
+            },
+            sunset: {
+                bg1: '#ff7e5f', bg2: '#feb47b', ground: '#8B6914', grass: '#FFA07A',
+                cloudColor: 'rgba(255, 200, 150, 0.6)', sunColor: '#FF6347'
+            },
+            rainbow: {
+                bg1: '#ffecd2', bg2: '#fcb69f', ground: '#FFB6C1', grass: '#98FB98',
+                cloudColor: 'rgba(255, 200, 255, 0.7)', sunColor: '#FF69B4'
+            }
+        };
+        
+        const skins = [
+            { body: '#ffd93d', belly: '#ffe066', face: '#fff' },
+            { body: '#ff6b9d', belly: '#ffb6c1', face: '#ffe5ec' },
+            { body: '#6bc2ff', belly: '#a8d8ea', face: '#e0f2ff' },
+            { body: '#c2ff6b', belly: '#e4ffaa', face: '#f0ffe0' }
+        ];
+        
+        const bird = {
+            x: 100,
+            y: canvas.height / 2,
+            width: 40,
+            height: 32,
+            velocity: 0,
+            gravity: 0.35,
+            jump: -6.8,
+            rotation: 0,
+            wingAngle: 0
+        };
+        
+        const pipes = [];
+        const pipeGap = 145;
+        const pipeWidth = 50;
+        let pipeSpeed = 2.8;
+        const pipeSpawnInterval = 1600;
+        let lastPipeTime = 0;
+        
+        const clouds = [];
+        const decorations = [];
+        const stars = [];
+        
+        let achievements = JSON.parse(localStorage.getItem('flyingKittyAchievements')) || [false, false, false, false];
+        
+        function createCloud() {
+            return {
+                x: Math.random() * canvas.width,
+                y: 30 + Math.random() * 100,
+                width: 70 + Math.random() * 40,
+                height: 35 + Math.random() * 20,
+                speed: 0.2 + Math.random() * 0.3
+            };
+        }
+        
+        for (let i = 0; i < 6; i++) {
+            clouds.push(createCloud());
+        }
+        
+        function selectSkin(index) {
+            selectedSkin = index;
+            document.querySelectorAll('.skin-btn').forEach((btn, i) => {
+                btn.classList.toggle('active', i === index);
+            });
+        }
+        
+        function updateAchievements() {
+            if (score >= 10 && !achievements[0]) { achievements[0] = true; showHearts(200, 200); }
+            if (score >= 25 && !achievements[1]) { achievements[1] = true; showHearts(250, 200); }
+            if (score >= 50 && !achievements[2]) { achievements[2] = true; showHearts(300, 200); }
+            if (score >= 100 && !achievements[3]) { achievements[3] = true; showHearts(350, 200); }
+            
+            achievements.forEach((ach, i) => {
+                document.getElementById(`ach${i+1}`).classList.toggle('unlocked', ach);
+            });
+            
+            localStorage.setItem('flyingKittyAchievements', JSON.stringify(achievements));
+        }
+        
+        function showHearts(x, y) {
+            const heart = document.createElement('div');
+            heart.className = 'hearts';
+            heart.textContent = '💖';
+            heart.style.left = x + 'px';
+            heart.style.top = y + 'px';
+            document.getElementById('gameContainer').appendChild(heart);
+            setTimeout(() => heart.remove(), 1000);
+        }
+        
+        function drawKitty() {
+            const skin = skins[selectedSkin];
+            ctx.save();
+            ctx.translate(bird.x + bird.width / 2, bird.y + bird.height / 2);
+            bird.rotation = Math.min(Math.max(bird.velocity * 3.5, -20), 45);
+            ctx.rotate(bird.rotation * Math.PI / 180);
+            
+            bird.wingAngle += 0.15;
+            const wingOffset = Math.sin(bird.wingAngle) * 5;
+            
+            // Tail
+            ctx.fillStyle = skin.body;
+            ctx.beginPath();
+            ctx.moveTo(-18, 8);
+            ctx.quadraticCurveTo(-28, 5 + wingOffset, -25, -5);
+            ctx.quadraticCurveTo(-18, -2, -18, 8);
+            ctx.fill();
+            
+            // Body
+            ctx.beginPath();
+            ctx.ellipse(0, 2, 20, 16, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Belly
+            ctx.fillStyle = skin.belly;
+            ctx.beginPath();
+            ctx.ellipse(5, 5, 12, 10, 0.3, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Ears
+            ctx.fillStyle = skin.body;
+            ctx.beginPath();
+            ctx.moveTo(-8, -10);
+            ctx.lineTo(-12, -20);
+            ctx.lineTo(-4, -14);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(8, -10);
+            ctx.lineTo(12, -20);
+            ctx.lineTo(4, -14);
+            ctx.fill();
+            
+            // Inner ears
+            ctx.fillStyle = '#ffb6c1';
+            ctx.beginPath();
+            ctx.moveTo(-8, -10);
+            ctx.lineTo(-10, -16);
+            ctx.lineTo(-6, -12);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.moveTo(8, -10);
+            ctx.lineTo(10, -16);
+            ctx.lineTo(6, -12);
+            ctx.fill();
+            
+            // Face
+            ctx.fillStyle = skin.face;
+            ctx.beginPath();
+            ctx.ellipse(5, 0, 14, 11, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Eyes
+            ctx.fillStyle = '#333';
+            ctx.beginPath();
+            ctx.ellipse(0, -2, 4, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(10, -2, 4, 5, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Eye shine
+            ctx.fillStyle = '#fff';
+            ctx.beginPath();
+            ctx.arc(-1, -4, 2, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.arc(9, -4, 2, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Nose
+            ctx.fillStyle = '#ffb6c1';
+            ctx.beginPath();
+            ctx.ellipse(5, 3, 3, 2, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Mouth
+            ctx.strokeStyle = '#333';
+            ctx.lineWidth = 1.5;
+            ctx.beginPath();
+            ctx.moveTo(5, 5);
+            ctx.quadraticCurveTo(8, 8, 11, 5);
+            ctx.stroke();
+            
+            // Cheeks
+            ctx.fillStyle = 'rgba(255, 182, 193, 0.6)';
+            ctx.beginPath();
+            ctx.ellipse(-4, 3, 4, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.beginPath();
+            ctx.ellipse(14, 3, 4, 3, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Wings
+            ctx.fillStyle = skin.body;
+            ctx.beginPath();
+            ctx.ellipse(-5, 8, 10, 7, -0.3 + wingOffset * 0.02, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.restore();
+        }
+        
+        function drawPipes() {
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, '#90EE90');
+            gradient.addColorStop(0.5, '#228B22');
+            gradient.addColorStop(1, '#90EE90');
+            
+            pipes.forEach(pipe => {
+                ctx.fillStyle = gradient;
+                
+                // Top pipe
+                ctx.beginPath();
+                ctx.roundRect(pipe.x, 0, pipeWidth, pipe.top, [0, 0, 10, 10]);
+                ctx.fill();
+                
+                // Top pipe cap
+                ctx.fillStyle = '#228B22';
+                ctx.beginPath();
+                ctx.roundRect(pipe.x - 5, pipe.top - 25, pipeWidth + 10, 25, [8, 8, 8, 8]);
+                ctx.fill();
+                
+                // Bottom pipe
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.roundRect(pipe.x, canvas.height - pipe.bottom, pipeWidth, pipe.bottom, [10, 10, 0, 0]);
+                ctx.fill();
+                
+                // Bottom pipe cap
+                ctx.fillStyle = '#228B22';
+                ctx.beginPath();
+                ctx.roundRect(pipe.x - 5, canvas.height - pipe.bottom, pipeWidth + 10, 25, [8, 8, 8, 8]);
+                ctx.fill();
+            });
+        }
+        
+        function drawClouds() {
+            const theme = themes[currentTheme];
+            ctx.fillStyle = theme.cloudColor;
+            clouds.forEach(cloud => {
+                ctx.beginPath();
+                ctx.arc(cloud.x, cloud.y, cloud.height / 2, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.width * 0.3, cloud.y - cloud.height * 0.3, cloud.height / 2.5, 0, Math.PI * 2);
+                ctx.arc(cloud.x + cloud.width * 0.6, cloud.y, cloud.height / 2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        }
+        
+        function drawStars() {
+            stars.forEach(star => {
+                const pulse = Math.sin(Date.now() / 300 + star.offset) * 0.3 + 0.7;
+                ctx.save();
+                ctx.translate(star.x, star.y);
+                ctx.scale(pulse, pulse);
+                
+                ctx.fillStyle = '#FFD700';
+                ctx.shadowColor = '#FFD700';
+                ctx.shadowBlur = 10;
+                
+                for (let i = 0; i < 5; i++) {
+                    ctx.lineTo(Math.cos((18 + i * 72) * Math.PI / 180) * 12,
+                              -Math.sin((18 + i * 72) * Math.PI / 180) * 12);
+                    ctx.lineTo(Math.cos((54 + i * 72) * Math.PI / 180) * 6,
+                              -Math.sin((54 + i * 72) * Math.PI / 180) * 6);
+                }
+                ctx.closePath();
+                ctx.fill();
+                
+                ctx.restore();
+            });
+        }
+        
+        function drawBackground() {
+            const theme = themes[currentTheme];
+            
+            const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            gradient.addColorStop(0, theme.bg1);
+            gradient.addColorStop(1, theme.bg2);
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Sun/Moon
+            ctx.fillStyle = theme.sunColor;
+            ctx.shadowColor = theme.sunColor;
+            ctx.shadowBlur = 30;
+            ctx.beginPath();
+            ctx.arc(700, 80, 40, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.shadowBlur = 0;
+            
+            // Ground
+            ctx.fillStyle = theme.ground;
+            ctx.fillRect(0, canvas.height - 20, canvas.width, 20);
+            ctx.fillStyle = theme.grass;
+            ctx.fillRect(0, canvas.height - 25, canvas.width, 5);
+        }
+        
+        function update() {
+            if (!gameRunning) return;
+            
+            // Bird physics
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+            
+            // Pipe spawning
+            const now = Date.now();
+            if (now - lastPipeTime > pipeSpawnInterval) {
+                const minHeight = 60;
+                const maxHeight = canvas.height - pipeGap - minHeight - 20;
+                const topHeight = minHeight + Math.random() * (maxHeight - minHeight);
+                
+                pipes.push({
+                    x: canvas.width,
+                    top: topHeight,
+                    bottom: canvas.height - pipeGap - topHeight,
+                    passed: false
+                });
+                
+                // Spawn collectible star
+                if (Math.random() < 0.4) {
+                    stars.push({
+                        x: canvas.width,
+                        y: topHeight + pipeGap / 2,
+                        collected: false,
+                        offset: Math.random() * Math.PI * 2
+                    });
+                }
+                
+                lastPipeTime = now;
+            }
+            
+            // Update pipes
+            for (let i = pipes.length - 1; i >= 0; i--) {
+                pipes[i].x -= pipeSpeed;
+                
+                if (!pipes[i].passed && pipes[i].x + pipeWidth < bird.x) {
+                    pipes[i].passed = true;
+                    score++;
+                    scoreDisplay.textContent = score;
+                    updateAchievements();
+                }
+                
+                if (
+                    bird.x < pipes[i].x + pipeWidth &&
+                    bird.x + bird.width > pipes[i].x &&
+                    (bird.y < pipes[i].top || bird.y + bird.height > canvas.height - pipes[i].bottom)
+                ) {
+                    gameOver();
+                    return;
+                }
+                
+                if (pipes[i].x + pipeWidth < 0) {
+                    pipes.splice(i, 1);
+                }
+            }
+            
+            // Update stars
+            for (let i = stars.length - 1; i >= 0; i--) {
+                stars[i].x -= pipeSpeed;
+                
+                if (!stars[i].collected &&
+                    bird.x < stars[i].x + 20 &&
+                    bird.x + bird.width > stars[i].x &&
+                    bird.y < stars[i].y + 20 &&
+                    bird.y + bird.height > stars[i].y) {
+                    stars[i].collected = true;
+                    score += 3;
+                    scoreDisplay.textContent = score;
+                    updateAchievements();
+                    showHearts(stars[i].x, stars[i].y);
+                }
+                
+                if (stars[i].x + 20 < 0) {
+                    stars.splice(i, 1);
+                }
+            }
+            
+            // Update clouds
+            clouds.forEach(cloud => {
+                cloud.x -= cloud.speed;
+                if (cloud.x + cloud.width < 0) {
+                    cloud.x = canvas.width + cloud.width;
+                    cloud.y = 30 + Math.random() * 100;
+                }
+            });
+            
+            if (bird.y + bird.height > canvas.height - 20) {
+                gameOver();
+                return;
+            }
+            
+            if (bird.y < 0) {
+                bird.y = 0;
+                bird.velocity = 0;
+            }
+        }
+        
+        function draw() {
+            drawBackground();
+            drawClouds();
+            drawPipes();
+            drawStars();
+            drawKitty();
+        }
+        
+        function gameLoop() {
+            if (!gameRunning) return;
+            update();
+            draw();
+            if (gameRunning) {
+                animationId = requestAnimationFrame(gameLoop);
+            }
+        }
+        
+        function startGame() {
+            gameRunning = true;
+            score = 0;
+            pipes.length = 0;
+            stars.length = 0;
+            bird.y = canvas.height / 2;
+            bird.velocity = 0;
+            lastPipeTime = Date.now();
+            
+            startScreen.classList.add('hidden');
+            gameOverScreen.classList.add('hidden');
+            scoreDisplay.classList.remove('hidden');
+            scoreDisplay.textContent = '0';
+            
+            gameLoop();
+        }
+        
+        function gameOver() {
+            gameRunning = false;
+            cancelAnimationFrame(animationId);
+            
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('flyingKittyBest', bestScore);
+            }
+            
+            finalScoreEl.textContent = `Score: ${score}`;
+            bestScoreEl.textContent = `Best: ${bestScore}`;
+            scoreDisplay.classList.add('hidden');
+            gameOverScreen.classList.remove('hidden');
+        }
+        
+        function jump() {
+            if (gameRunning) {
+                bird.velocity = bird.jump;
+            }
+        }
+        
+        const themeOrder = ['day', 'night', 'sunset', 'rainbow'];
+        themeBtn.addEventListener('click', () => {
+            const currentIndex = themeOrder.indexOf(currentTheme);
+            currentTheme = themeOrder[(currentIndex + 1) % themeOrder.length];
+            themeBtn.textContent = currentTheme === 'day' ? 'Day ☀️' :
+                                   currentTheme === 'night' ? 'Night 🌙' :
+                                   currentTheme === 'sunset' ? 'Sunset 🌅' :
+                                   'Rainbow 🌈';
+        });
+        
+        startBtn.addEventListener('click', startGame);
+        restartBtn.addEventListener('click', startGame);
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                if (gameRunning) {
+                    jump();
+                } else if (!startScreen.classList.contains('hidden')) {
+                    startGame();
+                } else if (!gameOverScreen.classList.contains('hidden')) {
+                    startGame();
+                }
+            }
+        });
+        
+        canvas.addEventListener('click', () => {
+            if (gameRunning) jump();
+        });
+        
+        // Load achievements
+        achievements.forEach((ach, i) => {
+            if (ach) document.getElementById(`ach${i+1}`).classList.add('unlocked');
+        });
+        
+        drawBackground();
+        drawClouds();
+        drawKitty();
+    </script>
+</body>
+</html>

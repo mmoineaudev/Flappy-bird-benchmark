@@ -1,6 +1,6 @@
 # project directory 
 
-* filename is : 'nvidia_Nemotron-Cascade-2-30B-A3B-Q6_K_50k'
+* filename is : 'Qwen3.5-27B-Q4_K_S_70k'
 
 * /home/neo/Desktop/flappy-birdZZZZs/
 
@@ -15,6 +15,11 @@ In order for the user to choose the final result, please do the process twice :
 * create a first file [filename].1-first-output.html
 * then review it, think about cosmetic and functional variation that could make this game more unique and fun
 * provide the 2nd version following your reflection on [filename].1-first-output.html, call it [filename].2-variation.html
+* then review it, think about cosmetic and functional variation that could make this game more unique and fun* then review it, think about cosmetic and functional variation that could make this game more unique and fun
+* provide the 2nd version following your reflection on [filename].2-variation.html
+* then review it, think about cosmetic and functional variation that could make this game more unique and fun* then review it, think about cosmetic and functional variation that could make this game more unique and fun
+* provide the 3rd version following your reflection on [filename].3-variation.html                     
+
 
 Provide a summary of what you did and the key differences between those two files. Commit and push the produced files.
 
