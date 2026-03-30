@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Bird - Variation 3</title>
+<style>
+  body,html{margin:0;height:100%;overflow:hidden;background:#87CEEB;font-family:sans-serif;}
+  canvas{display:block;margin:auto;background:#87CEEB;}
+</style>
+</head>
+<body>
+<canvas id="game" width="640" height="360"></canvas>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const W=640,H=360;
+let bird={x:80,y:H/2,vy:0,radius:12, wing:0};
+let gravity=0.5,lift=-8,friction=0.99;
+let pipes=[],pipeSpeed=2,score=0,highScore=parseInt(localStorage.getItem('flappyHS')||'0',10);
+let state='menu'; // menu, play, gameover
+let groundY=H-30;
+let cloudTimer=0;
+function reset(){bird.y=H/2;bird.vy=0;bird.wing=0;pipes=[];score=0;state='play';}
+function spawnPipe(){const gap=100+Math.random()*50; const topHeight=Math.random()* (H-100-40)+20; pipes.push({x:W, topHeight, bottomHeight:H-topHeight-gap, gap});}
+function update(){if(state==='play'){
+bird.vy+=gravity;bird.vy*=friction;bird.y+=bird.vy;
+if(bird.y<bird.radius){bird.y=bird.radius;bird.vy=0;}
+if(bird.y>H-bird.radius-30){bird.y=H-bird.radius-30;bird.vy=0;}
+if(pipes.length && bird.x+bird.radius>pipes[0].x-pipes[0].topHeight && bird.x-bird.radius<pipes[0].x+pipes[0].topHeight){
+if(bird.y-bird.radius<pipes[0].topHeight || bird.y+bird.radius>pipes[0].topHeight+pipes[0].gap) state='gameover';
+}
+if(pipes.length && bird.x>pipes[0].x+pipeWidth){
+pipes.shift();score++;
+if(Math.random()<0.02) spawnPipe();
+}
+if(!pipes.length) spawnPipe();
+pipes.forEach(p=>p.x-=pipeSpeed);
+bird.wing=bird.vy*2; // simple wing angle
+}
+}
+function draw(){ctx.clearRect(0,0,W,H);
+// sky gradient
+const grad=ctx.createLinearGradient(0,0,0,H);
+grad.addColorStop(0,'#87CEEB');
+grad.addColorStop(1,'#5c94fc');
+ctx.fillStyle=grad;ctx.fillRect(0,0,W,H);
+// moving clouds
+cloudTimer+=0.02;
+const cloudCount=5;
+for(let i=0;i<cloudCount;i++){
+const cx=W*0.2+ i*80 + Math.sin(cloudTimer+i)*30;
+const cy=50+Math.sin(cloudTimer*0.5+i)*10;
+ctx.fillStyle='rgba(255,255,255,0.7)';
+ctx.beginPath();ctx.arc(cx,cy,20,0,2*Math.PI);ctx.fill();ctx.beginPath();ctx.arc(cx+15,cy,25,0,2*Math.PI);ctx.fill();ctx.beginPath();ctx.arc(cx+30,cy,18,0,2*Math.PI);ctx.fill();
+}
+ctx.fillStyle='#654321';
+ctx.fillRect(0,groundY,W,H-groundY);
+// pipes
+for(let p of pipes){
+ctx.fillStyle='#0f0';
+ctx.fillRect(p.x,p.topHeight,p.pgap,p.topHeight);
+ctx.fillRect(p.x,p.topHeight+p.gap, p.pgap, H-(p.topHeight+p.gap));
+}
+ctx.fillStyle='#ff0';
+ctx.beginPath();ctx.arc(bird.x,bird.y,bird.radius,0,2*Math.PI);ctx.fill();
+// wings
+const wingAngle=bird.wing*Math.PI/180;
+ctx.save();
+ctx.translate(bird.x,bird.y);
+ctx.rotate(wingAngle);
+ctx.fillStyle='#ff0';
+ctx.beginPath();ctx.moveTo(0,0);
+ctx.lineTo(-10, -10);
+ctx.lineTo(-10, -5);
+ctx.closePath();ctx.fill();
+ctx.restore();
+// text
+ctx.fillStyle='#000';
+ctx.font='16px sans-serif';
+ctx.fillText('Score: '+score,20,30);
+ctx.fillText('High: '+highScore,20,50);
+if(state==='menu' || state==='gameover'){
+const overlay=document.getElementById('overlay');
+if(state==='menu'){
+overlay.textContent='Press Space to start';
+}else{
+overlay.textContent='Game Over - Press Space to restart';
+}
+}
+}
+function loop(){update();draw();if(state==='play') requestAnimationFrame(loop);}
+function onKey(e){if(e.code==='Space'){
+if(state==='menu' || state==='gameover') reset();
+else if(state==='play') bird.vy=lift;
+}
+}
+window.addEventListener('keydown',onKey);
+reset();
+loop();
+</script>
+</body>
+</html>

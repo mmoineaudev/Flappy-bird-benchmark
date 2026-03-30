@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Flappy Bird</title>
+<style>
+  body,html{margin:0;height:100%;background:#70c5ce;}
+  canvas{display:block;margin:auto;background:#70c5ce;}
+</style>
+</head>
+<body>
+<canvas id="game" width="640" height="360"></canvas>
+<script>
+const canvas=document.getElementById('game');
+const ctx=canvas.getContext('2d');
+const W=640,H=360;
+let bird={x:80,y:H/2,vy:0,radius:12};
+let gravity=0.5,lift=-8,friction=0.99;
+let pipes=[],pipeWidth=52,pipeGap=120,pipeSpeed=2,score=0;
+function reset(){bird.y=H/2;bird.vy=0;pipes=[];score=0;}
+function spawnPipe(){const topHeight=Math.random()* (H-100-40)+20; pipes.push({x:W,topHeight, bottomHeight:H-topHeight-pipeGap});}
+function update(){bird.vy+=gravity;bird.vy*=friction;bird.y+=bird.vy;
+if(bird.y<bird.radius){bird.y=bird.radius;bird.vy=0;}
+if(bird.y>H-bird.radius){bird.y=H-bird.radius;bird.vy=0;}
+if(pipes.length && bird.x+bird.radius>pipes[0].x-pipes[0].topHeight && bird.x-bird.radius<pipes[0].x+pipes[0].topHeight){
+if(bird.y-bird.radius<pipes[0].topHeight || bird.y+bird.radius>pipes[0].topHeight+pipeGap) reset();
+}
+if(pipes.length && bird.x>pipes[0].x+pipeWidth){
+pipes.shift();score++;
+if(Math.random()<0.02) spawnPipe();
+}
+if(!pipes.length) spawnPipe();
+pipes.forEach(p=>p.x-=pipeSpeed);
+}
+function draw(){ctx.clearRect(0,0,W,H);
+ctx.fillStyle='#70c5ce';
+ctx.fillRect(0,0,W,H);
+ctx.fillStyle='#ff0';
+ctx.beginPath();ctx.arc(bird.x,bird.y,bird.radius,0,2*Math.PI);ctx.fill();
+for(let p of pipes){ctx.fillStyle='#0f0';ctx.fillRect(p.x,p.topHeight,pipeWidth,p.topHeight);ctx.fillRect(p.x,p.topHeight+pipeGap,pipeWidth,H-(p.topHeight+pipeGap));}
+ctx.fillStyle='#000';
+ctx.font='20px sans-serif';
+ctx.fillText('Score: '+score,20,30);
+}
+function loop(){update();draw();if(!resetTriggered) requestAnimationFrame(loop);}
+let resetTriggered=false;
+function onKey(e){if(e.code==='Space'){bird.vy=lift; resetTriggered=true;}}
+window.addEventListener('keydown',onKey);
+reset();
+loop();
+</script>
+</body>
+</html>
