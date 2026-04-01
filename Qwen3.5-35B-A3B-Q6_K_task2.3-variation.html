@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neon Rush: Cyber Jump</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+        #gameContainer {
+            position: relative;
+            width: 720px;
+            height: 1080px;
+            border: 4px solid #0ff;
+            border-radius: 20px;
+            overflow: hidden;
+            box-shadow: 0 0 50px rgba(0, 255, 255, 0.5), inset 0 0 100px rgba(0, 255, 255, 0.1);
+        }
+        #gameCanvas {
+            display: block;
+        }
+        #uiLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .hud {
+            position: absolute;
+            padding: 25px;
+            color: #0ff;
+            font-size: 36px;
+            font-weight: bold;
+            text-shadow: 0 0 15px #0ff, 0 0 30px #0ff;
+        }
+        #score { top: 25px; left: 40px; }
+        #highScore { top: 90px; left: 40px; font-size: 30px; color: #f0f; }
+        #levelDisplay { top: 25px; right: 40px; font-size: 32px; color: #ff0; }
+        #healthBar { 
+            top: 80px; 
+            right: 40px; 
+            width: 200px;
+            height: 25px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 2px solid #f00;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+        #healthFill { 
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(90deg, #f00, #ff0, #0f0);
+            transition: width 0.3s;
+        }
+        #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            display: none;
+            pointer-events: auto;
+        }
+        #gameOverScreen h2 {
+            font-size: 80px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px #f0f, 0 0 60px #f0f;
+            background: linear-gradient(90deg, #f0f, #0ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #finalStats {
+            font-size: 32px;
+            margin-bottom: 25px;
+            color: #fff;
+            line-height: 1.8;
+        }
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            gap: 60px;
+            margin: 15px 0;
+        }
+        .stat-label { color: #0ff; }
+        .stat-value { color: #f0f; }
+        .btn {
+            background: linear-gradient(90deg, #f0f 0%, #0ff 100%);
+            border: none;
+            padding: 20px 60px;
+            font-size: 36px;
+            color: white;
+            border-radius: 80px;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s;
+            box-shadow: 0 15px 50px rgba(255, 0, 255, 0.5);
+            text-transform: uppercase;
+            letter-spacing: 4px;
+            font-weight: bold;
+        }
+        .btn:hover {
+            transform: scale(1.15) translateY(-8px);
+            box-shadow: 0 20px 70px rgba(0, 255, 255, 0.8);
+        }
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at center, rgba(10, 10, 30, 0.98) 0%, rgba(0, 0, 20, 1) 100%);
+            pointer-events: auto;
+        }
+        #startScreen h1 {
+            color: white;
+            font-size: 96px;
+            margin-bottom: 40px;
+            text-shadow: 0 0 40px #0ff, 0 0 80px #f0f;
+            background: linear-gradient(90deg, #0ff, #f0f, #ff0);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            animation: glitch 2s infinite;
+        }
+        @keyframes glitch {
+            0%, 100% { text-shadow: 0 0 40px #0ff, 0 0 80px #f0f; }
+            50% { text-shadow: -3px 0 #f0f, 3px 0 #0ff; }
+        }
+        .instructions {
+            color: #fff;
+            font-size: 28px;
+            margin-top: 50px;
+            text-align: center;
+            line-height: 2.2;
+            background: rgba(0, 255, 255, 0.1);
+            padding: 50px;
+            border-radius: 40px;
+            border: 3px solid rgba(0, 255, 255, 0.5);
+        }
+        .key {
+            display: inline-block;
+            background: #f0f;
+            padding: 8px 20px;
+            border-radius: 10px;
+            margin: 0 10px;
+            font-weight: bold;
+        }
+        #powerUpDisplay {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 20px;
+            pointer-events: auto;
+        }
+        .power-slot {
+            width: 80px;
+            height: 80px;
+            background: rgba(0, 0, 0, 0.7);
+            border: 3px solid #444;
+            border-radius: 20px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 48px;
+            transition: all 0.3s;
+        }
+        .power-slot.active {
+            border-color: #ff0;
+            box-shadow: 0 0 30px #ff0, inset 0 0 20px rgba(255, 255, 0, 0.5);
+            transform: scale(1.1);
+        }
+        #upgradeMenu {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 20, 0.98);
+            padding: 60px;
+            border-radius: 40px;
+            border: 4px solid #0ff;
+            box-shadow: 0 0 100px rgba(0, 255, 255, 0.5);
+            display: none;
+            pointer-events: auto;
+            z-index: 100;
+        }
+        #upgradeMenu h3 {
+            font-size: 48px;
+            color: #0ff;
+            margin-bottom: 40px;
+            text-shadow: 0 0 20px #0ff;
+        }
+        .upgrade-option {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 25px;
+            margin: 20px 0;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 20px;
+            border: 2px solid #444;
+            transition: all 0.3s;
+        }
+        .upgrade-option:hover {
+            border-color: #f0f;
+            box-shadow: 0 0 30px rgba(255, 0, 255, 0.5);
+        }
+        .upgrade-info h4 {
+            font-size: 32px;
+            color: #fff;
+            margin-bottom: 10px;
+        }
+        .upgrade-info p {
+            font-size: 24px;
+            color: #aaa;
+        }
+        .upgrade-btn {
+            background: linear-gradient(90deg, #f0f, #0ff);
+            border: none;
+            padding: 15px 40px;
+            font-size: 28px;
+            color: white;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upgrade-btn:hover {
+            transform: scale(1.1);
+        }
+        .upgrade-btn:disabled {
+            background: #444;
+            cursor: not-allowed;
+            transform: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="720" height="1080"></canvas>
+        <div id="uiLayer">
+            <div class="hud" id="score">SCORE: 0</div>
+            <div class="hud" id="highScore">BEST: 0</div>
+            <div class="hud" id="levelDisplay">LEVEL: 1</div>
+            <div id="healthBar"><div id="healthFill"></div></div>
+            <div id="startScreen">
+                <h1>NEON RUSH</h1>
+                <button class="btn" onclick="startGame()">INITIATE</button>
+                <div class="instructions">
+                    Press <span class="key">SPACE</span> or <span class="key">CLICK</span> to boost<br><br>
+                    Navigate through cyber barriers<br>
+                    Collect data shards for upgrades<br>
+                    Survive the neon nightmare!
+                </div>
+            </div>
+            <div id="gameOverScreen">
+                <h2>SYSTEM FAILURE</h2>
+                <div id="finalStats">
+                    <div class="stat-row">
+                        <span class="stat-label">FINAL SCORE:</span>
+                        <span class="stat-value" id="finalScore">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">BARRIERS CLEARED:</span>
+                        <span class="stat-value" id="barriersCleared">0</span>
+                    </div>
+                    <div class="stat-row">
+                        <span class="stat-label">DATA SHARDS:</span>
+                        <span class="stat-value" id="shardsCollected">0</span>
+                    </div>
+                </div>
+                <button class="btn" onclick="resetGame()">REBOOT SYSTEM</button>
+            </div>
+            <div id="upgradeMenu">
+                <h3>⚡ UPGRADE NODE</h3>
+                <div class="upgrade-option">
+                    <div class="upgrade-info">
+                        <h4>🚀 Thruster Boost</h4>
+                        <p>Stronger jumps, better control</p>
+                    </div>
+                    <button class="upgrade-btn" id="upgradeThruster" onclick="buyUpgrade('thruster')">500 SHARDS</button>
+                </div>
+                <div class="upgrade-option">
+                    <div class="upgrade-info">
+                        <h4>🛡️ Shield Generator</h4>
+                        <p>Take one extra hit</p>
+                    </div>
+                    <button class="upgrade-btn" id="upgradeShield" onclick="buyUpgrade('shield')">750 SHARDS</button>
+                </div>
+                <div class="upgrade-option">
+                    <div class="upgrade-info">
+                        <h4>🧲 Magnet Array</h4>
+                        <p>Pull shards from further away</p>
+                    </div>
+                    <button class="upgrade-btn" id="upgradeMagnet" onclick="buyUpgrade('magnet')">400 SHARDS</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game state
+        let gameState = 'start';
+        let score = 0;
+        let highScore = localStorage.getItem('neonRushHighScore') || 0;
+        let barriersCleared = 0;
+        let shardsCollected = 0;
+        document.getElementById('highScore').textContent = `BEST: ${highScore}`;
+        
+        // Player ship
+        const ship = {
+            x: 120,
+            y: 540,
+            width: 70,
+            height: 40,
+            velocity: 0,
+            gravity: 0.6,
+            jumpStrength: -13,
+            rotation: 0,
+            trail: [],
+            maxHealth: 100,
+            health: 100,
+            shieldLevel: 0,
+            magnetRange: 100,
+            thrusterLevel: 1
+        };
+        
+        // Cyber grid background
+        let gridLines = [];
+        for (let i = 0; i < 20; i++) {
+            gridLines.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                speed: Math.random() * 3 + 1
+            });
+        }
+        
+        // Neon particles
+        let neonParticles = [];
+        
+        // Barriers (cyber walls)
+        let barriers = [];
+        const barrierWidth = 100;
+        const barrierGap = 260;
+        let baseBarrierSpeed = 7;
+        let barrierSpawnRate = 120;
+        let currentLevel = 1;
+        
+        // Data shards (collectibles)
+        let dataShards = [];
+        
+        // Power-ups
+        let powerUps = [];
+        const powerUpTypes = ['health', 'shield', 'speed', 'slow', 'magnet'];
+        
+        // Upgrades purchased
+        let upgrades = {
+            thruster: 0,
+            shield: 0,
+            magnet: 0
+        };
+        
+        function drawCyberGrid() {
+            // Deep cyber background
+            const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bgGradient.addColorStop(0, '#000010');
+            bgGradient.addColorStop(0.5, '#0a0a20');
+            bgGradient.addColorStop(1, '#000020');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Moving grid lines
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+            ctx.lineWidth = 2;
+            
+            gridLines.forEach(line => {
+                if (gameState === 'playing') {
+                    line.x -= line.speed;
+                    if (line.x < 0) {
+                        line.x = canvas.width;
+                        line.y = Math.random() * canvas.height;
+                        line.speed = Math.random() * 3 + 1;
+                    }
+                }
+                
+                ctx.beginPath();
+                ctx.moveTo(line.x, 0);
+                ctx.lineTo(line.x, canvas.height);
+                ctx.stroke();
+            });
+            
+            // Horizontal grid lines (perspective effect)
+            const perspective = Math.sin(Date.now() * 0.001) * 50 + canvas.height / 2;
+            for (let i = 0; i < 10; i++) {
+                const y = perspective + i * 80;
+                if (y > 0 && y < canvas.height) {
+                    ctx.strokeStyle = `rgba(255, 0, 255, ${0.05 - i * 0.004})`;
+                    ctx.beginPath();
+                    ctx.moveTo(0, y);
+                    ctx.lineTo(canvas.width, y);
+                    ctx.stroke();
+                }
+            }
+            
+            // Floor platform
+            const floorGradient = ctx.createLinearGradient(0, canvas.height - 70, 0, canvas.height);
+            floorGradient.addColorStop(0, '#1a1a3a');
+            floorGradient.addColorStop(1, '#0a0a2a');
+            ctx.fillStyle = floorGradient;
+            ctx.fillRect(0, canvas.height - 70, canvas.width, 70);
+            
+            // Floor grid pattern
+            ctx.strokeStyle = '#0ff';
+            ctx.lineWidth = 1;
+            for (let i = 0; i < canvas.width; i += 50) {
+                ctx.beginPath();
+                ctx.moveTo(i, canvas.height - 70);
+                ctx.lineTo(i - 100, canvas.height);
+                ctx.stroke();
+            }
+        }
+        
+        function drawShip() {
+            // Draw trail
+            ship.trail.forEach((point, index) => {
+                const alpha = (index / ship.trail.length) * 0.6;
+                ctx.fillStyle = `rgba(0, 255, 255, ${alpha})`;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 4 + index * 0.3, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            ctx.save();
+            ctx.translate(ship.x + ship.width / 2, ship.y + ship.height / 2);
+            
+            ship.rotation = Math.min(Math.max(ship.velocity * 5, -60), 70);
+            ctx.rotate(ship.rotation * Math.PI / 180);
+            
+            // Shield effect
+            if (ship.shieldLevel > 0) {
+                ctx.shadowBlur = 30;
+                ctx.shadowColor = '#f0f';
+                ctx.strokeStyle = `rgba(255, 0, 255, ${0.5 + Math.sin(Date.now() * 0.01) * 0.3})`;
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.arc(0, 0, ship.width, 0, Math.PI * 2);
+                ctx.stroke();
+            }
+            
+            // Ship body gradient
+            const bodyGradient = ctx.createLinearGradient(-ship.width / 2, 0, ship.width / 2, 0);
+            bodyGradient.addColorStop(0, '#004466');
+            bodyGradient.addColorStop(0.5, '#00ffff');
+            bodyGradient.addColorStop(1, '#004466');
+            
+            ctx.fillStyle = bodyGradient;
+            ctx.beginPath();
+            ctx.moveTo(ship.width / 2, 0);
+            ctx.lineTo(-ship.width / 2, -ship.height / 2);
+            ctx.lineTo(-ship.width / 2 + 15, -ship.height / 3);
+            ctx.lineTo(0, ship.height / 3);
+            ctx.lineTo(ship.width / 2 - 15, -ship.height / 3);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Cockpit
+            ctx.fillStyle = '#ff0';
+            ctx.shadowBlur = 20;
+            ctx.shadowColor = '#ff0';
+            ctx.beginPath();
+            ctx.ellipse(5, -8, 15, 10, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Engine glow
+            const engineGlow = ctx.createRadialGradient(-ship.width / 3, 0, 0, -ship.width / 3, 0, 25);
+            engineGlow.addColorStop(0, '#ff6600');
+            engineGlow.addColorStop(0.5, '#ff4500');
+            engineGlow.addColorStop(1, 'transparent');
+            
+            ctx.fillStyle = engineGlow;
+            ctx.beginPath();
+            ctx.arc(-ship.width / 3, 0, 25, 0, Math.PI * 2);
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        }
+        
+        function drawBarriers() {
+            barriers.forEach(barrier => {
+                const barrierGradient = ctx.createLinearGradient(barrier.x, 0, barrier.x + barrierWidth, 0);
+                barrierGradient.addColorStop(0, '#ff0080');
+                barrierGradient.addColorStop(0.3, '#ff66cc');
+                barrierGradient.addColorStop(0.7, '#ff66cc');
+                barrierGradient.addColorStop(1, '#ff0080');
+                
+                ctx.fillStyle = barrierGradient;
+                
+                // Top barrier
+                ctx.fillRect(barrier.x, 0, barrierWidth, barrier.top);
+                
+                // Cyber pattern on barriers
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                for (let i = 0; i < barrier.top; i += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(barrier.x + 10, i);
+                    ctx.lineTo(barrier.x + barrierWidth - 10, i + 20);
+                    ctx.stroke();
+                }
+                
+                // Glowing edges
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = '#ff0080';
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(barrier.x, 0, barrierWidth, barrier.top);
+                
+                // Bottom barrier
+                const bottomY = barrier.top + barrierGap;
+                ctx.fillRect(barrier.x, bottomY, barrierWidth, canvas.height - bottomY - 70);
+                ctx.strokeRect(barrier.x, bottomY, barrierWidth, canvas.height - bottomY - 70);
+                
+                // Cyber pattern on bottom barrier
+                for (let i = bottomY; i < canvas.height - 70; i += 40) {
+                    ctx.beginPath();
+                    ctx.moveTo(barrier.x + 10, i);
+                    ctx.lineTo(barrier.x + barrierWidth - 10, i + 20);
+                    ctx.stroke();
+                }
+                
+                ctx.shadowBlur = 0;
+            });
+        }
+        
+        function drawDataShards() {
+            dataShards.forEach(shard => {
+                const pulse = Math.sin(Date.now() * 0.003) * 5 + 20;
+                
+                ctx.save();
+                ctx.translate(shard.x + shard.size / 2, shard.y + shard.size / 2);
+                
+                // Glow effect
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#ff0';
+                
+                // Rotating diamond shape
+                const rotation = Date.now() * 0.001;
+                ctx.strokeStyle = '#ff0';
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                ctx.moveTo(0, -pulse);
+                ctx.lineTo(pulse, 0);
+                ctx.lineTo(0, pulse);
+                ctx.lineTo(-pulse, 0);
+                ctx.closePath();
+                ctx.stroke();
+                
+                // Inner core
+                ctx.fillStyle = '#fff';
+                ctx.beginPath();
+                ctx.arc(0, 0, 8, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            });
+        }
+        
+        function drawPowerUps() {
+            powerUps.forEach(powerUp => {
+                ctx.save();
+                ctx.translate(powerUp.x + powerUp.size / 2, powerUp.y + powerUp.size / 2);
+                
+                const colors = {
+                    health: '#f00',
+                    shield: '#f0f',
+                    speed: '#ff0',
+                    slow: '#0ff',
+                    magnet: '#fa0'
+                };
+                
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = colors[powerUp.type];
+                
+                // Hexagon shape
+                ctx.strokeStyle = colors[powerUp.type];
+                ctx.lineWidth = 4;
+                ctx.beginPath();
+                for (let i = 0; i < 6; i++) {
+                    const angle = (i * Math.PI / 3) - Math.PI / 2;
+                    const x = Math.cos(angle) * (powerUp.size / 2);
+                    const y = Math.sin(angle) * (powerUp.size / 2);
+                    if (i === 0) ctx.moveTo(x, y);
+                    else ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                
+                // Icon
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 32px Arial';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                const icons = { health: '+', shield: '🛡️', speed: '⚡', slow: '❄️', magnet: '🧲' };
+                ctx.fillText(icons[powerUp.type], 0, 0);
+                
+                ctx.restore();
+            });
+        }
+        
+        function spawnBarrier() {
+            const minHeight = 100;
+            const maxHeight = canvas.height - barrierGap - minHeight - 70;
+            const topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+            
+            barriers.push({
+                x: canvas.width,
+                top: topHeight,
+                passed: false
+            });
+        }
+        
+        function spawnDataShard() {
+            dataShards.push({
+                x: canvas.width,
+                y: 100 + Math.random() * (canvas.height - 300),
+                size: 50,
+                value: 100
+            });
+        }
+        
+        function spawnPowerUp() {
+            if (powerUps.length >= 2) return;
+            
+            const typeIndex = Math.floor(Math.random() * powerUpTypes.length);
+            const type = powerUpTypes[typeIndex];
+            
+            powerUps.push({
+                x: canvas.width,
+                y: 150 + Math.random() * (canvas.height - 400),
+                size: 70,
+                type: type
+            });
+        }
+        
+        function update() {
+            if (gameState !== 'playing') return;
+            
+            // Ship physics
+            ship.velocity += ship.gravity;
+            ship.y += ship.velocity;
+            
+            // Calculate speed multiplier based on power-ups
+            let speedMultiplier = 1;
+            let currentBarrierSpeed = baseBarrierSpeed * currentLevel;
+            
+            Object.keys(powerUps).forEach(key => {
+                if (powerUps[key].active && powerUps[key].multiplier) {
+                    speedMultiplier = powerUps[key].multiplier;
+                }
+            });
+            
+            // Move barriers
+            barriers.forEach(barrier => {
+                barrier.x -= currentBarrierSpeed * speedMultiplier;
+            });
+            
+            // Remove off-screen barriers
+            barriers = barriers.filter(barrier => barrier.x + barrierWidth > 0);
+            
+            // Move data shards
+            dataShards.forEach(shard => {
+                const dx = (ship.x + ship.width / 2) - shard.x;
+                const dy = (ship.y + ship.height / 2) - shard.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                // Magnet effect
+                if (upgrades.magnet > 0 && distance < ship.magnetRange) {
+                    shard.x += (dx / distance) * 8;
+                    shard.y += (dy / distance) * 8;
+                } else {
+                    shard.x -= 5 * speedMultiplier;
+                }
+            });
+            
+            // Remove off-screen shards
+            dataShards = dataShards.filter(shard => shard.x + shard.size > 0);
+            
+            // Move power-ups
+            powerUps.forEach(powerUp => {
+                powerUp.x -= 4 * speedMultiplier;
+            });
+            
+            // Remove off-screen power-ups
+            powerUps = powerUps.filter(powerUp => powerUp.x + powerUp.size > 0);
+            
+            // Spawn new barriers
+            if (barriers.length === 0 || barriers[barriers.length - 1].x < canvas.width - barrierSpawnRate) {
+                spawnBarrier();
+            }
+            
+            // Spawn data shards
+            if (Math.random() < 0.02 && dataShards.length < 5) {
+                spawnDataShard();
+            }
+            
+            // Spawn power-ups
+            if (Math.random() < 0.003 && powerUps.length < 3) {
+                spawnPowerUp();
+            }
+            
+            // Update power-up durations
+            Object.keys(powerUps).forEach(key => {
+                if (powerUps[key].active) {
+                    powerUps[key].duration--;
+                    if (powerUps[key].duration <= 0) {
+                        powerUps[key].active = false;
+                    }
+                }
+            });
+            
+            // Collision detection with barriers
+            barriers.forEach(barrier => {
+                const shipLeft = ship.x + 15;
+                const shipRight = ship.x + ship.width - 15;
+                const shipTop = ship.y + 10;
+                const shipBottom = ship.y + ship.height - 10;
+                
+                if (shipRight > barrier.x && shipLeft < barrier.x + barrierWidth) {
+                    if (shipTop < barrier.top || shipBottom > barrier.top + barrierGap) {
+                        if (ship.shieldLevel > 0) {
+                            ship.shieldLevel--;
+                            barriers = barriers.filter(b => b !== barrier);
+                            showFloatingText('SHIELD BROKEN!', ship.x, ship.y);
+                        } else {
+                            ship.health -= 34; // 3 hits to die
+                            updateHealthBar();
+                            if (ship.health <= 0) {
+                                gameOver();
+                            } else {
+                                ship.velocity = -10; // Bounce back
+                                showFloatingText('HIT!', ship.x, ship.y);
+                            }
+                        }
+                    }
+                }
+                
+                if (!barrier.passed && shipLeft > barrier.x + barrierWidth) {
+                    barrier.passed = true;
+                    barriersCleared++;
+                    score += 10 * currentLevel;
+                    updateScore();
+                    
+                    // Level up every 10 barriers
+                    const newLevel = Math.floor(barriersCleared / 10) + 1;
+                    if (newLevel > currentLevel) {
+                        currentLevel = newLevel;
+                        baseBarrierSpeed += 0.5;
+                        barrierSpawnRate = Math.max(80, 120 - currentLevel * 5);
+                        showFloatingText(`LEVEL UP! LEVEL ${currentLevel}`, ship.x, ship.y);
+                    }
+                }
+            });
+            
+            // Collision detection with data shards
+            for (let i = dataShards.length - 1; i >= 0; i--) {
+                const shard = dataShards[i];
+                const dx = (ship.x + ship.width / 2) - (shard.x + shard.size / 2);
+                const dy = (ship.y + ship.height / 2) - (shard.y + shard.size / 2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < ship.width / 2 + shard.size / 2) {
+                    shardsCollected += shard.value;
+                    dataShards.splice(i, 1);
+                    showFloatingText(`+${shard.value} SHARDS`, ship.x, ship.y);
+                    
+                    // Show upgrade menu when enough shards
+                    if (shardsCollected >= 400 && gameState === 'playing') {
+                        showUpgradeMenu();
+                    }
+                }
+            }
+            
+            // Collision detection with power-ups
+            for (let i = powerUps.length - 1; i >= 0; i--) {
+                const powerUp = powerUps[i];
+                const dx = (ship.x + ship.width / 2) - (powerUp.x + powerUp.size / 2);
+                const dy = (ship.y + ship.height / 2) - (powerUp.y + powerUp.size / 2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < ship.width / 2 + powerUp.size / 2) {
+                    activatePowerUp(powerUp.type);
+                    powerUps.splice(i, 1);
+                }
+            }
+            
+            // Check boundaries
+            if (ship.y > canvas.height - 70 - ship.height || ship.y < 0) {
+                ship.health -= 20;
+                updateHealthBar();
+                if (ship.health <= 0) {
+                    gameOver();
+                } else {
+                    ship.y = canvas.height - 100;
+                    ship.velocity = 0;
+                }
+            }
+        }
+        
+        function updateScore() {
+            document.getElementById('score').textContent = `SCORE: ${score}`;
+        }
+        
+        function updateHealthBar() {
+            const healthPercent = Math.max(0, (ship.health / ship.maxHealth) * 100);
+            document.getElementById('healthFill').style.width = `${healthPercent}%`;
+        }
+        
+        function showFloatingText(text, x, y) {
+            const textElement = document.createElement('div');
+            textElement.textContent = text;
+            textElement.style.position = 'absolute';
+            textElement.style.left = x + 'px';
+            textElement.style.top = y + 'px';
+            textElement.style.color = '#fff';
+            textElement.style.fontSize = '32px';
+            textElement.style.fontWeight = 'bold';
+            textElement.style.textShadow = '0 0 20px currentColor';
+            textElement.style.pointerEvents = 'none';
+            document.getElementById('gameContainer').appendChild(textElement);
+            
+            setTimeout(() => textElement.remove(), 1000);
+        }
+        
+        function showUpgradeMenu() {
+            gameState = 'paused';
+            document.getElementById('upgradeMenu').style.display = 'block';
+            
+            // Update button states based on available shards
+            document.getElementById('upgradeThruster').disabled = shardsCollected < 500;
+            document.getElementById('upgradeShield').disabled = shardsCollected < 750;
+            document.getElementById('upgradeMagnet').disabled = shardsCollected < 400;
+        }
+        
+        function buyUpgrade(type) {
+            const costs = { thruster: 500, shield: 750, magnet: 400 };
+            
+            if (shardsCollected >= costs[type]) {
+                shardsCollected -= costs[type];
+                upgrades[type]++;
+                
+                // Apply upgrade effects
+                if (type === 'thruster') {
+                    ship.jumpStrength = -13 - upgrades['thruster'] * 1;
+                } else if (type === 'shield') {
+                    ship.shieldLevel++;
+                } else if (type === 'magnet') {
+                    ship.magnetRange = 100 + upgrades['magnet'] * 50;
+                }
+                
+                showFloatingText(`UPGRADED! ${type.toUpperCase()}`, ship.x, ship.y);
+                
+                // Update button states
+                document.getElementById('upgradeThruster').disabled = shardsCollected < costs.thruster;
+                document.getElementById('upgradeShield').disabled = shardsCollected < costs.shield;
+                document.getElementById('upgradeMagnet').disabled = shardsCollected < costs.magnet;
+            }
+        }
+        
+        function closeUpgradeMenu() {
+            document.getElementById('upgradeMenu').style.display = 'none';
+            gameState = 'playing';
+        }
+        
+        function activatePowerUp(type) {
+            Object.keys(powerUps).forEach(key => {
+                powerUps[key].active = false;
+            });
+            
+            const effects = {
+                health: { duration: 1, apply: () => { ship.health = Math.min(ship.maxHealth, ship.health + 34); updateHealthBar(); } },
+                shield: { duration: 600, active: true, multiplier: 1 },
+                speed: { duration: 720, active: true, multiplier: 1.5 },
+                slow: { duration: 600, active: true, multiplier: 0.5 },
+                magnet: { duration: 480, active: true, multiplier: 1 }
+            };
+            
+            const effect = effects[type];
+            if (effect.apply) effect.apply();
+            else powerUps[type] = { active: true, duration: effect.duration, multiplier: effect.multiplier };
+            
+            const names = {
+                health: '❤️ HEALTH RESTORED!',
+                shield: '🛡️ SHIELD ACTIVE!',
+                speed: '⚡ SPEED BOOST!',
+                slow: '❄️ SLOW MOTION!',
+                magnet: '🧲 MAGNET ONLINE!'
+            };
+            
+            showFloatingText(names[type], ship.x, ship.y);
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawCyberGrid();
+            drawBarriers();
+            drawDataShards();
+            drawPowerUps();
+            drawShip();
+            
+            // Update level display
+            document.getElementById('levelDisplay').textContent = `LEVEL: ${currentLevel}`;
+        }
+        
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function startGame() {
+            closeUpgradeMenu();
+            
+            gameState = 'playing';
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            // Reset game state
+            ship.y = 540;
+            ship.velocity = 0;
+            ship.health = ship.maxHealth;
+            barriers = [];
+            dataShards = [];
+            powerUps = [];
+            score = 0;
+            barriersCleared = 0;
+            shardsCollected = 0;
+            currentLevel = 1;
+            baseBarrierSpeed = 7;
+            barrierSpawnRate = 120;
+            
+            updateScore();
+            updateHealthBar();
+            
+            setTimeout(() => spawnBarrier(), 500);
+        }
+        
+        function gameOver() {
+            gameState = 'gameover';
+            
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('neonRushHighScore', highScore);
+                document.getElementById('highScore').textContent = `BEST: ${highScore}`;
+            }
+            
+            document.getElementById('finalScore').textContent = score;
+            document.getElementById('barriersCleared').textContent = barriersCleared;
+            document.getElementById('shardsCollected').textContent = shardsCollected;
+            document.getElementById('gameOverScreen').style.display = 'block';
+        }
+        
+        function resetGame() {
+            gameState = 'start';
+            document.getElementById('startScreen').style.display = 'flex';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            ship.y = 540;
+            ship.velocity = 0;
+            ship.health = ship.maxHealth;
+            barriers = [];
+            dataShards = [];
+            powerUps = [];
+            score = 0;
+            barriersCleared = 0;
+            shardsCollected = 0;
+            upgrades = { thruster: 0, shield: 0, magnet: 0 };
+            currentLevel = 1;
+            
+            updateScore();
+            updateHealthBar();
+        }
+        
+        function flap() {
+            if (gameState === 'playing') {
+                ship.velocity = ship.jumpStrength - (upgrades.thruster * 0.5);
+            } else if (gameState === 'start') {
+                startGame();
+            }
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                flap();
+            }
+        });
+        
+        canvas.addEventListener('click', flap);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            flap();
+        });
+        
+        gameLoop();
+    </script>
+</body>
+</html>

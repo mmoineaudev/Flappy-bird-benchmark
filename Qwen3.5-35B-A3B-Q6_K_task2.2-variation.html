@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cosmic Flap Adventure</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            width: 720px;
+            height: 1080px;
+            border: 6px solid #ffd700;
+            border-radius: 15px;
+            overflow: hidden;
+            box-shadow: 0 30px 80px rgba(255, 215, 0, 0.3), inset 0 0 60px rgba(255, 215, 0, 0.1);
+        }
+        #gameCanvas {
+            display: block;
+        }
+        #uiLayer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+        }
+        .hud {
+            position: absolute;
+            padding: 20px;
+            color: #ffd700;
+            font-size: 32px;
+            font-weight: bold;
+            text-shadow: 0 0 10px rgba(255, 215, 0, 0.8);
+        }
+        #score { top: 20px; left: 30px; }
+        #highScore { top: 75px; left: 30px; font-size: 26px; color: #ff6b9d; }
+        #powerUpIndicator { 
+            top: 20px; 
+            right: 30px; 
+            font-size: 28px; 
+            text-align: right;
+        }
+        #gameOverScreen {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            color: white;
+            display: none;
+            pointer-events: auto;
+        }
+        #gameOverScreen h2 {
+            font-size: 72px;
+            margin-bottom: 20px;
+            text-shadow: 0 0 20px #ff6b9d, 3px 3px 6px rgba(0,0,0,0.8);
+            background: linear-gradient(45deg, #ff6b9d, #ffd700);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        #finalScore {
+            font-size: 42px;
+            margin-bottom: 15px;
+            color: #ffd700;
+        }
+        #comboDisplay {
+            font-size: 36px;
+            color: #ff6b9d;
+            margin-bottom: 30px;
+            display: none;
+        }
+        .btn {
+            background: linear-gradient(135deg, #ff6b9d 0%, #ffd700 100%);
+            border: none;
+            padding: 18px 50px;
+            font-size: 32px;
+            color: white;
+            border-radius: 60px;
+            cursor: pointer;
+            pointer-events: auto;
+            transition: all 0.3s;
+            box-shadow: 0 10px 40px rgba(255, 107, 157, 0.4);
+            text-transform: uppercase;
+            letter-spacing: 2px;
+        }
+        .btn:hover {
+            transform: scale(1.1) translateY(-5px);
+            box-shadow: 0 15px 50px rgba(255, 107, 157, 0.6);
+        }
+        #startScreen {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(ellipse at center, rgba(26, 26, 46, 0.95) 0%, rgba(15, 52, 96, 0.98) 100%);
+            pointer-events: auto;
+        }
+        #startScreen h1 {
+            color: white;
+            font-size: 84px;
+            margin-bottom: 30px;
+            text-shadow: 0 0 30px #ff6b9d, 0 0 60px #ffd700;
+            background: linear-gradient(45deg, #ff6b9d, #ffd700, #87ceeb);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .instructions {
+            color: #fff;
+            font-size: 26px;
+            margin-top: 40px;
+            text-align: center;
+            line-height: 2;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 40px;
+            border-radius: 30px;
+            border: 2px solid rgba(255, 215, 0, 0.3);
+        }
+        .powerup-icon {
+            font-size: 40px;
+            margin: 10px;
+        }
+        #customizationPanel {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            padding: 25px;
+            border-radius: 20px;
+            display: flex;
+            gap: 30px;
+            pointer-events: auto;
+        }
+        .color-option {
+            width: 50px;
+            height: 50px;
+            border-radius: 50%;
+            cursor: pointer;
+            border: 4px solid white;
+            transition: transform 0.2s;
+        }
+        .color-option:hover {
+            transform: scale(1.2);
+        }
+        .color-option.selected {
+            border-color: #ffd700;
+            box-shadow: 0 0 20px #ffd700;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="720" height="1080"></canvas>
+        <div id="uiLayer">
+            <div class="hud" id="score">Score: 0</div>
+            <div class="hud" id="highScore">Best: 0</div>
+            <div class="hud" id="powerUpIndicator"></div>
+            <div id="startScreen">
+                <h1>🌟 Cosmic Flap 🌟</h1>
+                <button class="btn" onclick="startGame()">START ADVENTURE</button>
+                <div class="instructions">
+                    Press SPACE or CLICK to flap<br>
+                    Collect cosmic orbs for power-ups!<br>
+                    <span class="powerup-icon">⚡</span> Speed Boost | 
+                    <span class="powerup-icon">❄️</span> Slow Motion | 
+                    <span class="powerup-icon">🧲</span> Magnet | 
+                    <span class="powerup-icon">💎</span> Diamond Shield
+                    <br><br>
+                    <strong>Customize Your Ship:</strong>
+                </div>
+                <div id="customizationPanel">
+                    <div class="color-option selected" style="background: #ff6b9d;" onclick="selectColor('#ff6b9d', this)"></div>
+                    <div class="color-option" style="background: #ffd700;" onclick="selectColor('#ffd700', this)"></div>
+                    <div class="color-option" style="background: #87ceeb;" onclick="selectColor('#87ceeb', this)"></div>
+                    <div class="color-option" style="background: #32cd32;" onclick="selectColor('#32cd32', this)"></div>
+                    <div class="color-option" style="background: #ff4500;" onclick="selectColor('#ff4500', this)"></div>
+                </div>
+            </div>
+            <div id="gameOverScreen">
+                <h2>MISSION ENDED</h2>
+                <div id="finalScore">Score: 0</div>
+                <div id="comboDisplay">🔥 COMBO x5!</div>
+                <button class="btn" onclick="resetGame()">RETRY MISSION</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+        
+        // Game state
+        let gameState = 'start';
+        let score = 0;
+        let highScore = localStorage.getItem('cosmicHighScore') || 0;
+        let comboCount = 0;
+        let comboTimer = null;
+        document.getElementById('highScore').textContent = `Best: ${highScore}`;
+        
+        // Player customization
+        let playerColor = '#ff6b9d';
+        
+        function selectColor(color, element) {
+            playerColor = color;
+            document.querySelectorAll('.color-option').forEach(el => el.classList.remove('selected'));
+            element.classList.add('selected');
+        }
+        
+        // Ship properties (instead of bird)
+        const ship = {
+            x: 150,
+            y: 540,
+            width: 60,
+            height: 35,
+            velocity: 0,
+            gravity: 0.55,
+            jumpStrength: -11,
+            rotation: 0,
+            trail: []
+        };
+        
+        // Nebula background particles
+        let nebulaParticles = [];
+        for (let i = 0; i => 80; i++) {
+            nebulaParticles.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: Math.random() * 4 + 1,
+                color: `hsl(${Math.random() * 60 + 200}, 70%, 60%)`,
+                speed: Math.random() * 1.5 + 0.3,
+                twinkleSpeed: Math.random() * 0.05 + 0.02
+            });
+        }
+        
+        // Nebula clouds
+        let nebulaClouds = [];
+        for (let i = 0; i < 6; i++) {
+            nebulaClouds.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                radius: 150 + Math.random() * 100,
+                color: `hsla(${Math.random() * 60 + 200}, 60%, 50%, ${0.03 + Math.random() * 0.04})`,
+                driftSpeed: Math.random() * 0.3 + 0.1
+            });
+        }
+        
+        // Asteroids field
+        let asteroids = [];
+        for (let i = 0; i < 20; i++) {
+            asteroids.push({
+                x: Math.random() * canvas.width,
+                y: Math.random() * canvas.height,
+                size: 3 + Math.random() * 5,
+                speed: Math.random() * 2 + 1
+            });
+        }
+        
+        // Pipes (now "Energy Barriers")
+        let barriers = [];
+        const barrierWidth = 90;
+        const barrierGap = 300;
+        const barrierSpawnRate = 130;
+        
+        // Bonus items (Cosmic Orbs)
+        let cosmicOrbs = [];
+        const orbTypes = ['speed', 'slow', 'magnet', 'diamond'];
+        
+        // Power-up effects
+        let powerUps = {
+            speed: { active: false, duration: 0, multiplier: 1.5 },
+            slow: { active: false, duration: 0, multiplier: 0.6 },
+            magnet: { active: false, duration: 0 },
+            diamond: { active: false, duration: 0, invincible: true }
+        };
+        
+        // Combo system
+        let comboMultiplier = 1;
+        
+        function drawNebula() {
+            // Deep space background
+            const bgGradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+            bgGradient.addColorStop(0, '#0a0a1a');
+            bgGradient.addColorStop(0.5, '#1a1a3e');
+            bgGradient.addColorStop(1, '#2d1b4e');
+            ctx.fillStyle = bgGradient;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw nebula clouds
+            nebulaClouds.forEach(cloud => {
+                if (gameState === 'playing') {
+                    cloud.x -= cloud.driftSpeed;
+                    if (cloud.x + cloud.radius < 0) cloud.x = canvas.width + cloud.radius;
+                }
+                
+                const gradient = ctx.createRadialGradient(
+                    cloud.x, cloud.y, 0,
+                    cloud.x, cloud.y, cloud.radius
+                );
+                gradient.addColorStop(0, cloud.color);
+                gradient.addColorStop(1, 'transparent');
+                
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(cloud.x, cloud.y, cloud.radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Draw nebula particles
+            ctx.fillStyle = 'white';
+            nebulaParticles.forEach(particle => {
+                if (gameState === 'playing') {
+                    particle.x -= particle.speed;
+                    if (particle.x < 0) particle.x = canvas.width;
+                    
+                    // Twinkle effect
+                    const alpha = 0.3 + Math.sin(Date.now() * particle.twinkleSpeed) * 0.2;
+                    ctx.globalAlpha = alpha;
+                }
+                
+                ctx.beginPath();
+                ctx.arc(particle.x, particle.y, particle.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            
+            // Asteroids
+            asteroids.forEach(asteroid => {
+                if (gameState === 'playing') {
+                    asteroid.x -= asteroid.speed;
+                    if (asteroid.x + asteroid.size < 0) {
+                        asteroid.x = canvas.width;
+                        asteroid.y = Math.random() * canvas.height;
+                    }
+                }
+                
+                ctx.fillStyle = '#696969';
+                ctx.beginPath();
+                ctx.arc(asteroid.x, asteroid.y, asteroid.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            
+            // Space station platform (bottom)
+            const platformGradient = ctx.createLinearGradient(0, canvas.height - 60, 0, canvas.height);
+            platformGradient.addColorStop(0, '#4a4a6a');
+            platformGradient.addColorStop(1, '#2a2a4a');
+            ctx.fillStyle = platformGradient;
+            ctx.fillRect(0, canvas.height - 60, canvas.width, 60);
+            
+            // Platform details
+            ctx.fillStyle = '#ffd700';
+            for (let i = 0; i < canvas.width; i += 80) {
+                ctx.fillRect(i, canvas.height - 55, 40, 10);
+            }
+        }
+        
+        function drawShip() {
+            ship.trail.push({ x: ship.x + ship.width / 2, y: ship.y + ship.height / 2 });
+            if (ship.trail.length > 20) ship.trail.shift();
+            
+            // Draw trail
+            ship.trail.forEach((point, index) => {
+                const alpha = index / ship.trail.length * 0.5;
+                ctx.fillStyle = playerColor;
+                ctx.globalAlpha = alpha;
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 3 + index * 0.2, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            ctx.globalAlpha = 1;
+            
+            ctx.save();
+            ctx.translate(ship.x + ship.width / 2, ship.y + ship.height / 2);
+            
+            ship.rotation = Math.min(Math.max(ship.velocity * 4, -50), 80);
+            ctx.rotate(ship.rotation * Math.PI / 180);
+            
+            // Shield effect when diamond power-up is active
+            if (powerUps.diamond.active) {
+                ctx.shadowBlur = 20;
+                ctx.shadowColor = '#00ffff';
+            }
+            
+            // Main body
+            const bodyGradient = ctx.createLinearGradient(-ship.width / 2, 0, ship.width / 2, 0);
+            bodyGradient.addColorStop(0, playerColor);
+            bodyGradient.addColorStop(0.5, '#ffffff');
+            bodyGradient.addColorStop(1, playerColor);
+            
+            ctx.fillStyle = bodyGradient;
+            ctx.beginPath();
+            ctx.moveTo(ship.width / 2, 0);
+            ctx.lineTo(-ship.width / 2, -ship.height / 2);
+            ctx.lineTo(-ship.width / 3, -ship.height / 2);
+            ctx.lineTo(-ship.width / 3, -ship.height / 4);
+            ctx.lineTo(0, ship.height / 4);
+            ctx.lineTo(ship.width / 3, -ship.height / 4);
+            ctx.lineTo(ship.width / 3, -ship.height / 2);
+            ctx.closePath();
+            ctx.fill();
+            
+            // Cockpit
+            ctx.fillStyle = '#87ceeb';
+            ctx.beginPath();
+            ctx.ellipse(0, -5, 12, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+            
+            // Engine glow
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = '#ff4500';
+            ctx.fillStyle = '#ff6347';
+            ctx.beginPath();
+            ctx.moveTo(-ship.width / 3, -ship.height / 4);
+            ctx.lineTo(-ship.width / 2, 0);
+            ctx.lineTo(-ship.width / 3, ship.height / 4);
+            ctx.closePath();
+            ctx.fill();
+            
+            ctx.shadowBlur = 0;
+            ctx.restore();
+        }
+        
+        function drawBarriers() {
+            barriers.forEach(barrier => {
+                const barrierGradient = ctx.createLinearGradient(barrier.x, 0, barrier.x + barrierWidth, 0);
+                barrierGradient.addColorStop(0, '#ff6347');
+                barrierGradient.addColorStop(0.3, '#ffa500');
+                barrierGradient.addColorStop(0.7, '#ffa500');
+                barrierGradient.addColorStop(1, '#ff6347');
+                
+                ctx.fillStyle = barrierGradient;
+                
+                // Top barrier
+                ctx.fillRect(barrier.x, 0, barrierWidth, barrier.top);
+                
+                // Energy glow effect
+                ctx.shadowBlur = 10;
+                ctx.shadowColor = '#ff4500';
+                ctx.strokeStyle = '#ff6347';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(barrier.x, 0, barrierWidth, barrier.top);
+                
+                // Barrier cap (top)
+                ctx.fillStyle = '#ff4500';
+                ctx.fillRect(barrier.x - 8, barrier.top - 35, barrierWidth + 16, 35);
+                ctx.strokeRect(barrier.x - 8, barrier.top - 35, barrierWidth + 16, 35);
+                
+                // Bottom barrier
+                const bottomY = barrier.top + barrierGap;
+                ctx.fillRect(barrier.x, bottomY, barrierWidth, canvas.height - bottomY - 60);
+                ctx.strokeRect(barrier.x, bottomY, barrierWidth, canvas.height - bottomY - 60);
+                
+                // Barrier cap (bottom)
+                ctx.fillStyle = '#ff4500';
+                ctx.fillRect(barrier.x - 8, bottomY, barrierWidth + 16, 35);
+                ctx.strokeRect(barrier.x - 8, bottomY, barrierWidth + 16, 35);
+                
+                ctx.shadowBlur = 0;
+            });
+        }
+        
+        function drawCosmicOrbs() {
+            cosmicOrbs.forEach(orb => {
+                const pulse = Math.sin(Date.now() * 0.005) * 5 + 25;
+                
+                ctx.save();
+                ctx.translate(orb.x + orb.size / 2, orb.y + orb.size / 2);
+                
+                // Outer glow
+                ctx.shadowBlur = 25;
+                ctx.shadowColor = orb.color;
+                
+                // Rotating rings
+                const rotation = Date.now() * 0.002;
+                ctx.strokeStyle = orb.color;
+                ctx.lineWidth = 3;
+                ctx.beginPath();
+                ctx.ellipse(0, 0, pulse + 10, pulse / 2, rotation, 0, Math.PI * 2);
+                ctx.stroke();
+                ctx.beginPath();
+                ctx.ellipse(0, 0, pulse + 8, pulse / 2.5, -rotation, 0, Math.PI * 2);
+                ctx.stroke();
+                
+                // Core
+                ctx.fillStyle = orb.color;
+                ctx.beginPath();
+                ctx.arc(0, 0, orb.size / 2, 0, Math.PI * 2);
+                ctx.fill();
+                
+                // Inner core
+                ctx.fillStyle = '#ffffff';
+                ctx.beginPath();
+                ctx.arc(0, 0, orb.size / 4, 0, Math.PI * 2);
+                ctx.fill();
+                
+                ctx.restore();
+            });
+        }
+        
+        function spawnBarrier() {
+            const minHeight = 120;
+            const maxHeight = canvas.height - barrierGap - minHeight - 60;
+            const topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+            
+            barriers.push({
+                x: canvas.width,
+                top: topHeight,
+                passed: false
+            });
+        }
+        
+        function spawnCosmicOrb() {
+            if (cosmicOrbs.length >= 3) return;
+            
+            const typeIndex = Math.floor(Math.random() * orbTypes.length);
+            const type = orbTypes[typeIndex];
+            
+            cosmicOrbs.push({
+                x: canvas.width,
+                y: 150 + Math.random() * (canvas.height - 400),
+                size: 60,
+                type: type,
+                color: type === 'speed' ? '#ffd700' : 
+                       type === 'slow' ? '#87ceeb' : 
+                       type === 'magnet' ? '#ff69b4' : '#00ffff',
+                symbol: type === 'speed' ? '⚡' : 
+                        type === 'slow' ? '❄️' : 
+                        type === 'magnet' ? '🧲' : '💎'
+            });
+        }
+        
+        function update() {
+            if (gameState !== 'playing') return;
+            
+            // Ship physics
+            ship.velocity += ship.gravity;
+            ship.y += ship.velocity;
+            
+            // Calculate speed multiplier
+            let speedMultiplier = 1;
+            Object.keys(powerUps).forEach(key => {
+                if (powerUps[key].active && powerUps[key].multiplier) {
+                    speedMultiplier = powerUps[key].multiplier;
+                }
+            });
+            
+            // Move barriers
+            barriers.forEach(barrier => {
+                barrier.x -= 6 * speedMultiplier;
+            });
+            
+            // Remove off-screen barriers
+            barriers = barriers.filter(barrier => barrier.x + barrierWidth > 0);
+            
+            // Move cosmic orbs
+            cosmicOrbs.forEach(orb => {
+                orb.x -= 4 * speedMultiplier;
+            });
+            
+            // Remove off-screen orbs
+            cosmicOrbs = cosmicOrbs.filter(orb => orb.x + orb.size > 0);
+            
+            // Spawn new barriers
+            if (barriers.length === 0 || barriers[barriers.length - 1].x < canvas.width - barrierSpawnRate) {
+                spawnBarrier();
+            }
+            
+            // Spawn cosmic orbs randomly
+            if (Math.random() < 0.008 && cosmicOrbs.length < 4) {
+                spawnCosmicOrb();
+            }
+            
+            // Update power-up durations
+            Object.keys(powerUps).forEach(key => {
+                if (powerUps[key].active) {
+                    powerUps[key].duration--;
+                    if (powerUps[key].duration <= 0) {
+                        powerUps[key].active = false;
+                        if (key === 'diamond') comboCount = 0;
+                    }
+                }
+            });
+            
+            // Collision detection with barriers
+            barriers.forEach(barrier => {
+                const shipLeft = ship.x + 12;
+                const shipRight = ship.x + ship.width - 12;
+                const shipTop = ship.y + 8;
+                const shipBottom = ship.y + ship.height - 8;
+                
+                if (shipRight > barrier.x && shipLeft < barrier.x + barrierWidth) {
+                    if (shipTop < barrier.top || shipBottom > barrier.top + barrierGap) {
+                        if (powerUps.diamond.active) {
+                            // Destroy barrier with diamond shield
+                            barriers = barriers.filter(b => b !== barrier);
+                            score += 5;
+                            comboCount++;
+                            updateCombo();
+                        } else {
+                            gameOver();
+                        }
+                    }
+                }
+                
+                if (!barrier.passed && shipLeft > barrier.x + barrierWidth) {
+                    barrier.passed = true;
+                    comboCount++;
+                    updateCombo();
+                }
+            });
+            
+            // Collision detection with cosmic orbs
+            for (let i = cosmicOrbs.length - 1; i >= 0; i--) {
+                const orb = cosmicOrbs[i];
+                const dx = (ship.x + ship.width / 2) - (orb.x + orb.size / 2);
+                const dy = (ship.y + ship.height / 2) - (orb.y + orb.size / 2);
+                const distance = Math.sqrt(dx * dx + dy * dy);
+                
+                if (distance < ship.width / 2 + orb.size / 2) {
+                    activatePowerUp(orb.type);
+                    cosmicOrbs.splice(i, 1);
+                }
+            }
+            
+            // Check boundaries
+            if (ship.y > canvas.height - 60 - ship.height || ship.y < 0) {
+                gameOver();
+            }
+        }
+        
+        function updateCombo() {
+            clearTimeout(comboTimer);
+            
+            let displayScore = score * comboMultiplier;
+            document.getElementById('score').textContent = `Score: ${displayScore}`;
+            
+            if (comboCount >= 5) {
+                document.getElementById('comboDisplay').style.display = 'block';
+                document.getElementById('comboDisplay').textContent = `🔥 COMBO x${comboMultiplier}!`;
+            }
+            
+            comboTimer = setTimeout(() => {
+                comboCount = 0;
+                comboMultiplier = 1;
+                document.getElementById('comboDisplay').style.display = 'none';
+            }, 3000);
+        }
+        
+        function activatePowerUp(type) {
+            Object.keys(powerUps).forEach(key => {
+                powerUps[key].active = false;
+            });
+            
+            powerUps[type].active = true;
+            powerUps[type].duration = 720; // 12 seconds at 60fps
+            
+            const names = {
+                speed: '⚡ SPEED OVERDRIVE!',
+                slow: '❄️ TIME DILATION!',
+                magnet: '🧲 GRAVITY WELL!',
+                diamond: '💎 DIAMOND SHIELD!'
+            };
+            
+            showFloatingText(names[type], ship.x, ship.y);
+        }
+        
+        function showFloatingText(text, x, y) {
+            const textElement = document.createElement('div');
+            textElement.textContent = text;
+            textElement.style.position = 'absolute';
+            textElement.left = x + 'px';
+            textElement.top = y + 'px';
+            textElement.color = 'white';
+            textElement.fontSize = '28px';
+            textElement.fontWeight = 'bold';
+            textElement.textShadow = '0 0 20px currentColor';
+            textElement.pointerEvents = 'none';
+            document.getElementById('gameContainer').appendChild(textElement);
+            
+            setTimeout(() => textElement.remove(), 1500);
+        }
+        
+        function draw() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            drawNebula();
+            drawBarriers();
+            drawCosmicOrbs();
+            drawShip();
+            
+            // Draw power-up indicator
+            let indicator = '';
+            Object.keys(powerUps).forEach(key => {
+                if (powerUps[key].active) {
+                    const icons = { speed: '⚡', slow: '❄️', magnet: '🧲', diamond: '💎' };
+                    indicator += `${icons[key]} `;
+                }
+            });
+            document.getElementById('powerUpIndicator').textContent = indicator || '';
+        }
+        
+        function gameLoop() {
+            update();
+            draw();
+            requestAnimationFrame(gameLoop);
+        }
+        
+        function startGame() {
+            gameState = 'playing';
+            document.getElementById('startScreen').style.display = 'none';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            ship.y = 540;
+            ship.velocity = 0;
+            barriers = [];
+            cosmicOrbs = [];
+            score = 0;
+            comboCount = 0;
+            comboMultiplier = 1;
+            document.getElementById('score').textContent = 'Score: 0';
+            
+            setTimeout(() => spawnBarrier(), 500);
+        }
+        
+        function gameOver() {
+            gameState = 'gameover';
+            clearTimeout(comboTimer);
+            
+            let finalScore = score * comboMultiplier;
+            
+            if (finalScore > highScore) {
+                highScore = finalScore;
+                localStorage.setItem('cosmicHighScore', highScore);
+                document.getElementById('highScore').textContent = `Best: ${highScore}`;
+            }
+            
+            document.getElementById('finalScore').textContent = `Score: ${finalScore}`;
+            document.getElementById('gameOverScreen').style.display = 'block';
+        }
+        
+        function resetGame() {
+            gameState = 'start';
+            document.getElementById('startScreen').style.display = 'flex';
+            document.getElementById('gameOverScreen').style.display = 'none';
+            
+            ship.y = 540;
+            ship.velocity = 0;
+            barriers = [];
+            cosmicOrbs = [];
+            score = 0;
+            comboCount = 0;
+            comboMultiplier = 1;
+            document.getElementById('score').textContent = 'Score: 0';
+        }
+        
+        function flap() {
+            if (gameState === 'playing') {
+                ship.velocity = ship.jumpStrength;
+            } else if (gameState === 'start') {
+                startGame();
+            }
+        }
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                flap();
+            }
+        });
+        
+        canvas.addEventListener('click', flap);
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            flap();
+        });
+        
+        gameLoop();
+    </script>
+</body>
+</html>
