@@ -1,6 +1,6 @@
 # project directory 
 
-* filename is : 'Qwen3.5-35-Q6_K_task2_le_retour'
+* filename is : 'GLMMM_task2_le_retour2'
 
 * /home/neo/Documents/flappy-birdZZZZs/
 
