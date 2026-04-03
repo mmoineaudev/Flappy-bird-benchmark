@@ -1,8 +1,8 @@
 # project directory 
 
-* filename is : ' '
+* filename is : 'Qwen3.5-35-Q6_K_task2_le_retour'
 
-* /home/neo/Desktop/flappy-birdZZZZs/
+* /home/neo/Documents/flappy-birdZZZZs/
 
 # your task  
 
@@ -14,7 +14,7 @@ There is a background, and game is bounded by the main canvas side.
 there are bonuses floating, granting several effects : one of them is speed*1.5 .
 
 
-In order for the user to choose the final result, please do the process twice :
+In order for the user to choose the final result, please do this process, keep in mind that the game should remain playable for the user :
 * create a first file [filename].1-first-output.html
 * then review it, think about cosmetic and functional variation that could make this game more unique and fun
 * provide the 2nd version following your reflection on [filename].1-first-output.html, call it [filename].2-variation.html
