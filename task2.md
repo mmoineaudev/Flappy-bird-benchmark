@@ -1,6 +1,6 @@
 # project directory 
 
-* filename is : 'q3.5.28b_zed_q4_0_60k_fast'
+* filename is : 'GLM-4.7-Flash-Q6_K.gguf-ctx-size_50000-host_0.0.0.0-port_8080_-ngl_auto_-t_22-batch-size_524-cache-type-k_q8_0-cache-type-v_q8_0-temp_1.0-top-p_0.95-top-k_40-min-p_0.01-presence-penalty_1.0-repeat-penalty_1.0-flash-attn_on'
 
 * /home/neo/Documents/flappy-birdZZZZs/
 
