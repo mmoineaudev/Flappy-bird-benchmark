@@ -1,0 +1,943 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080, height=720">
+    <title>Flappy Bird - WebGL Enhanced</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #2d1d4f 100%);
+            font-family: 'Arial', sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 80px rgba(100, 200, 255, 0.4);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            border-radius: 15px;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: white;
+            font-size: 24px;
+            text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);
+            z-index: 10;
+        }
+        #bonuses {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            gap: 10px;
+        }
+        .bonus-indicator {
+            padding: 5px 15px;
+            border-radius: 20px;
+            color: white;
+            font-size: 16px;
+            font-weight: bold;
+            animation: pulse 1s infinite;
+        }
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+        #settings {
+            position: absolute;
+            top: 60px;
+            right: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            color: white;
+            z-index: 20;
+        }
+        #settings select {
+            width: 100%;
+            padding: 8px;
+            margin: 5px 0;
+            border: none;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas"></canvas>
+        <div id="ui">Score: <span id="scoreDisplay">0</span></div>
+        <div id="bonuses"></div>
+        <div id="settings" class="hidden">
+            <h3 style="margin-bottom: 10px;">Settings</h3>
+            <label>Bird Color:</label>
+            <select id="birdColor">
+                <option value="#FFD700">Golden</option>
+                <option value="#FF6B35">Orange</option>
+                <option value="#FF1497">Pink</option>
+                <option value="#00d4ff">Cyan</option>
+                <option value="#2ECC71">Green</option>
+            </select>
+            <label>Game Theme:</label>
+            <select id="gameTheme">
+                <option value="day">Day</option>
+                <option value="sunset">Sunset</option>
+                <option value="night">Night</option>
+                <option value="forest">Forest</option>
+            </select>
+            <button onclick="toggleSettings()" style="margin-top: 10px; padding: 5px 15px; cursor: pointer;">Close</button>
+        </div>
+        <button id="settingsBtn" onclick="toggleSettings()" style="position: absolute; top: 10px; right: 10px; padding: 8px 12px; background: rgba(0,0,0,0.5); color: white; border: none; border-radius: 5px; cursor: pointer; z-index: 30;">⚙️</button>
+    </div>
+
+    <script>
+        // Three.js scene setup
+        const canvas = document.getElementById('gameCanvas');
+        const container = document.getElementById('gameContainer');
+        const scoreDisplay = document.getElementById('scoreDisplay');
+        const bonusesDiv = document.getElementById('bonuses');
+
+        // User personalization settings
+        let userSettings = {
+            birdColor: '#FFD700',
+            gameTheme: 'day'
+        };
+
+        // Game state
+        let gameState = 'start';
+        let score = 0;
+        let highScore = localStorage.getItem('flappyHighScore') || 0;
+        let speedMultiplier = 1.0;
+        let activeBonuses = {};
+
+        // Three.js variables
+        let scene, camera, renderer;
+        let birdMesh, birdWingLeft, birdWingRight;
+        let particles = [];
+        let bonusItems = [];
+        let pipeGroup = new THREE.Group();
+        let cloudGroup = new THREE.Group();
+        let groundMesh;
+
+        // Bonus items data
+        const bonusTypes = [
+            { type: 'speed', color: 0xff6b35, label: '⚡ Speed+', glowColor: 0xFF4500 },
+            { type: 'slow', color: 0x00d4ff, label: '❄️ Slow', glowColor: 0x0088FF },
+            { type: 'grow', color: 0xff1497, label: '💖 Grow', glowColor: 0xD900AA },
+            { type: 'shield', color: 0xffffff, label: '🛡️ Shield', glowColor: 0xFFFFFF },
+            { type: 'points', color: 0xffd700, label: '⭐ 2x Points', glowColor: 0xFFD700 },
+            { type: 'extraLife', color: 0xff4444, label: '❤️ Extra Life', glowColor: 0xFF0000 }
+        ];
+
+        // Theme colors
+        const themeColors = {
+            day: { sky1: 0x87CEEB, sky2: 0xB0E0F9, ground: 0x8B4500 },
+            sunset: { sky1: 0xFF6B35, sky2: 0xFFD700, ground: 0xC75A24 },
+            night: { sky1: 0x0f0c20, sky2: 0x1a1a2e, ground: 0x2d1d4f },
+            forest: { sky1: 0x2E8650, sky2: 0x58DCA6, ground: 0x1B9E47 }
+        };
+
+        // Bird properties
+        const bird = {
+            x: 200,
+            y: 360,
+            radius: 25,
+            velocity: 0,
+            gravity: 0.5,
+            jumpStrength: -10,
+            rotation: 0,
+            lives: 1,
+            shielded: false
+        };
+
+        // Game constants
+        const pipeWidth = 80;
+        const pipeGap = 200;
+        const spawnRate = 200;
+        let frameCount = 0;
+
+        // Initialize Three.js scene
+        function initThree() {
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+
+            scene = new THREE.Scene();
+
+            camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+            camera.position.z = 50;
+            camera.position.y = 0;
+
+            renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio || 1);
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(100, 100, 50);
+            scene.add(directionalLight);
+
+            // Create bird
+            createBird();
+
+            // Add pipe group
+            scene.add(pipeGroup);
+
+            // Create cloud group
+            initClouds();
+            scene.add(cloudGroup);
+
+            // Create ground
+            initGround();
+
+            // Handle window resize
+            window.addEventListener('resize', () => {
+                const newWidth = container.clientWidth;
+                const newHeight = container.clientHeight;
+                renderer.setSize(newWidth, newHeight);
+                camera.aspect = newWidth / newHeight;
+                camera.updateProjectionMatrix();
+            });
+        }
+
+        // Create bird mesh with 3D effects
+        function createBird() {
+            birdMesh = new THREE.Group();
+
+            // Bird body
+            const bodyGeometry = new THREE.SphereGeometry(bird.radius, 32, 32);
+            const bodyMaterial = new THREE.MeshPhongMaterial({
+                color: userSettings.birdColor,
+                shininess: 100
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            birdMesh.add(body);
+
+            // Bird eye
+            const eyeGeometry = new THREE.SphereGeometry(8, 16, 16);
+            const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
+            const eye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            eye.position.set(bird.radius * 0.4, -bird.radius * 0.3, bird.radius * 0.9);
+            birdMesh.add(eye);
+
+            const pupilGeometry = new THREE.SphereGeometry(3, 16, 16);
+            const pupilMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+            const pupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+            pupil.position.set(bird.radius * 0.5, -bird.radius * 0.3, bird.radius * 1.05);
+            birdMesh.add(pupil);
+
+            // Bird beak
+            const beakGeometry = new THREE.ConeGeometry(8, 15, 16, 1, false);
+            const beakMaterial = new THREE.MeshPhongMaterial({ color: 0xFF6B35 });
+            const beak = new THREE.Mesh(beakGeometry, beakMaterial);
+            beak.rotation.z = Math.PI / 2;
+            beak.position.set(bird.radius * 1.1, 0, 0);
+            birdMesh.add(beak);
+
+            // Bird wing left
+            birdWingLeft = createWing();
+            birdWingLeft.position.set(-bird.radius * 0.3, bird.radius * 0.2, -bird.radius * 0.5);
+            birdWingLeft.name = 'wingLeft';
+            birdMesh.add(birdWingLeft);
+
+            // Bird wing right
+            birdWingRight = createWing();
+            birdWingRight.position.set(-bird.radius * 0.3, bird.radius * 0.2, bird.radius * 0.5);
+            birdWingRight.name = 'wingRight';
+            birdMesh.add(birdWingRight);
+
+            // Shield effect (initially hidden)
+            const shieldGeometry = new THREE.SphereGeometry(bird.radius * 1.3, 32, 32);
+            const shieldMaterial = new THREE.MeshPhongMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0,
+                shininess: 50
+            });
+            birdShield = new THREE.Mesh(shieldGeometry, shieldMaterial);
+            birdShield.visible = false;
+            birdMesh.add(birdShield);
+
+            birdMesh.position.set(bird.x, bird.y, 0);
+            scene.add(birdMesh);
+        }
+
+        // Create wing mesh
+        function createWing() {
+            const wingGeometry = new THREE.SphereGeometry(12, 16, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+            const wingMaterial = new THREE.MeshPhongMaterial({
+                color: userSettings.birdColor,
+                shininess: 50
+            });
+            const wing = new THREE.Mesh(wingGeometry, wingMaterial);
+            wing.rotation.z = -Math.PI / 4;
+            return wing;
+        }
+
+        // Initialize clouds with Three.js
+        function initClouds() {
+            cloudGroup.clear();
+
+            for (let i = 0; i < 5; i++) {
+                const cloud = createCloud();
+                cloud.position.set(
+                    Math.random() * container.clientWidth,
+                    Math.random() * 300 + 50,
+                    -20
+                );
+                cloudGroup.add(cloud);
+            }
+        }
+
+        // Create cloud mesh
+        function createCloud() {
+            const cloud = new THREE.Group();
+
+            const cloudMaterial = new THREE.MeshPhongMaterial({
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.8
+            });
+
+            for (let j = 0; j < 5; j++) {
+                const sphereGeometry = new THREE.SphereGeometry(40 + Math.random() * 60, 16, 16);
+                const sphere = new THREE.Mesh(sphereGeometry, cloudMaterial);
+                sphere.position.set(j * 30 - 60, (Math.random() - 0.5) * 20, (Math.random() - 0.5) * 20);
+                cloud.add(sphere);
+            }
+
+            return cloud;
+        }
+
+        // Initialize ground with Three.js
+        function initGround() {
+            const groundGeometry = new THREE.PlaneGeometry(container.clientWidth, 100);
+            const colors = themeColors[userSettings.gameTheme];
+            const vertexColors = [];
+
+            for (let i = 0; i < 4; i++) {
+                vertexColors.push(colors.ground);
+                vertexColors.push(colors.ground);
+                vertexColors.push(0x2d1d4f);
+                vertexColors.push(colors.ground);
+            }
+
+            groundGeometry.setAttribute('color', new THREE.Float32BufferAttribute(vertexColors, 3));
+
+            const groundMaterial = new THREE.MeshLambertMaterial({ vertexColors: true });
+            groundMesh = new THREE.Mesh(groundGeometry, groundMaterial);
+            groundMesh.rotation.x = -Math.PI / 2;
+            groundMesh.position.y = -50;
+            groundMesh.position.z = -40;
+
+            scene.add(groundMesh);
+        }
+
+        // Spawn pipe with Three.js
+        function spawnPipe() {
+            const minHeight = 80;
+            const maxHeight = container.clientHeight - pipeGap - minHeight;
+            const topHeight = Math.random() * (maxHeight - minHeight) + minHeight;
+
+            const colors = themeColors[userSettings.gameTheme];
+
+            // Pipe material
+            const pipeMaterial = new THREE.MeshPhongMaterial({
+                color: colors.ground,
+                shininess: 30
+            });
+
+            // Top pipe
+            const topPipeGeometry = new THREE.BoxGeometry(pipeWidth, topHeight, 20);
+            const topPipe = new THREE.Mesh(topPipeGeometry, pipeMaterial);
+            topPipe.position.set(container.clientWidth, -topHeight / 2 + container.clientHeight / 2, 5);
+
+            // Top pipe cap
+            const capGeometry = new THREE.BoxGeometry(pipeWidth + 10, 20, 22);
+            const topCap = new THREE.Mesh(capGeometry, pipeMaterial);
+            topCap.position.set(container.clientWidth, -topHeight / 2 + container.clientHeight / 2, 5);
+
+            // Bottom pipe
+            const bottomHeight = container.clientHeight - topHeight - pipeGap;
+            const bottomPipe = new THREE.Mesh(topPipeGeometry, pipeMaterial);
+            bottomPipe.position.set(container.clientWidth, topHeight + pipeGap / 2 + container.clientHeight / 2, 5);
+
+            // Bottom pipe cap
+            const bottomCap = new THREE.Mesh(capGeometry, pipeMaterial);
+            bottomCap.position.set(container.clientWidth, topHeight + pipeGap / 2 + container.clientHeight / 2, 5);
+
+            // Add glow effect
+            const glowGeometry = new THREE.SphereGeometry(pipeWidth * 1.5, 16, 16);
+            const glowMaterial = new THREE.MeshBasicMaterial({
+                color: colors.ground,
+                transparent: true,
+                opacity: 0.2
+            });
+            const glow = new THREE.Mesh(glowGeometry, glowMaterial);
+
+            pipeGroup.add(topPipe, topCap, bottomPipe, bottomCap, glow);
+
+            pipes.push({
+                x: container.clientWidth,
+                topHeight: topHeight,
+                passed: false,
+                meshGroup: { topPipe, topCap, bottomPipe, bottomCap, glow }
+            });
+        }
+
+        // Spawn bonus item with Three.js
+        function spawnBonus() {
+            if (Math.random() < 0.15 && bonusItems.length < 4) {
+                const bonusData = bonusTypes[Math.floor(Math.random() * bonusTypes.length)];
+
+                // Bonus sphere
+                const geometry = new THREE.SphereGeometry(25, 32, 32);
+                const material = new THREE.MeshPhongMaterial({
+                    color: bonusData.color,
+                    emissive: bonusData.glowColor,
+                    emissiveIntensity: 0.3,
+                    shininess: 100
+                });
+                const bonusMesh = new THREE.Mesh(geometry, material);
+
+                // Glow ring
+                const ringGeometry = new THREE.TorusGeometry(40, 2, 16, 32);
+                const ringMaterial = new THREE.MeshBasicMaterial({
+                    color: bonusData.glowColor,
+                    transparent: true,
+                    opacity: 0.5
+                });
+                const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring.rotation.y = Math.PI / 2;
+
+                bonusMesh.add(ring);
+
+                bonusMesh.position.set(
+                    container.clientWidth,
+                    Math.random() * (container.clientHeight - 100) + 50,
+                    0
+                );
+
+                scene.add(bonusMesh);
+
+                bonusItems.push({
+                    mesh: bonusMesh,
+                    ...bonusData,
+                    rotationSpeed: 0.02
+                });
+            }
+        }
+
+        // Create particle explosion
+        function createParticleExplosion(color, x, y) {
+            for (let i = 0; i < 30; i++) {
+                const geometry = new THREE.SphereGeometry(3 + Math.random() * 3, 8, 8);
+                const material = new THREE.MeshBasicMaterial({ color });
+                const particle = new THREE.Mesh(geometry, material);
+
+                particle.position.set(x, y, 0);
+
+                particle.userData = {
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 10
+                    ),
+                    life: 60
+                };
+
+                scene.add(particle);
+                particles.push(particle);
+            }
+        }
+
+        // Update particles
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const particle = particles[i];
+                particle.userData.life--;
+                particle.position.add(particle.userData.velocity);
+                particle.userData.velocity.y -= 0.2; // Gravity
+
+                if (particle.userData.life <= 0) {
+                    scene.remove(particle);
+                    particle.geometry.dispose();
+                    particle.material.dispose();
+                    particles.splice(i, 1);
+                }
+            }
+        }
+
+        // Update bonuses display with HTML overlay
+        function updateBonusesDisplay() {
+            bonusesDiv.innerHTML = '';
+            const bonusNames = {
+                'speed': { text: '⚡ Speed Boost', color: '#ff6b35' },
+                'slow': { text: '❄️ Slow Motion', color: '#00d4ff' },
+                'grow': { text: '💖 Enlarged Bird', color: '#ff1497' },
+                'shield': { text: '🛡️ Shield Active', color: '#ffffff' },
+                'points': { text: '⭐ 2x Points', color: '#ffd700' },
+                'extraLife': { text: '❤️ Extra Life', color: '#ff4444' }
+            };
+
+            for (const [type, endTime] of Object.entries(activeBonuses)) {
+                const bonus = bonusNames[type];
+                if (endTime > Date.now()) {
+                    const indicator = document.createElement('div');
+                    indicator.className = 'bonus-indicator';
+                    indicator.style.backgroundColor = bonus.color;
+                    const timeLeft = Math.ceil((endTime - Date.now()) / 1000);
+                    indicator.textContent = `${bonus.text} (${timeLeft}s)`;
+                    bonusesDiv.appendChild(indicator);
+                } else {
+                    delete activeBonuses[type];
+                }
+            }
+        }
+
+        // Activate bonus effect
+        function activateBonus(type) {
+            if (type === 'speed') {
+                speedMultiplier = 1.5;
+                activeBonuses['speed'] = Date.now() + 10000;
+            } else if (type === 'slow') {
+                speedMultiplier = 0.5;
+                activeBonuses['slow'] = Date.now() + 10000;
+            } else if (type === 'grow') {
+                bird.radius = 35;
+                updateBirdSize();
+                activeBonuses['grow'] = Date.now() + 10000;
+            } else if (type === 'shield') {
+                bird.shielded = true;
+                activeBonuses['shield'] = Date.now() + 8000;
+                birdShield.visible = true;
+                birdShield.material.opacity = 0.4;
+            } else if (type === 'points') {
+                speedMultiplier = 1.2;
+                activeBonuses['points'] = Date.now() + 15000;
+            } else if (type === 'extraLife') {
+                bird.lives++;
+                updateLivesDisplay();
+            }
+
+            const bonusData = bonusTypes.find(b => b.type === type);
+            createParticleExplosion(bonusData.glowColor, bird.x, bird.y);
+            updateBonusesDisplay();
+        }
+
+        // Update bird size when grow bonus is active
+        function updateBirdSize() {
+            birdMesh.children[0].geometry = new THREE.SphereGeometry(bird.radius, 32, 32);
+            birdMesh.position.set(bird.x, bird.y, 0);
+        }
+
+        // Check for expired bonuses
+        function checkExpiredBonuses() {
+            if (activeBonuses['speed'] && Date.now() > activeBonuses['speed']) {
+                speedMultiplier = 1.0;
+                delete activeBonuses['speed'];
+            }
+            if (activeBonuses['slow'] && Date.now() > activeBonuses['slow']) {
+                speedMultiplier = 1.0;
+                delete activeBonuses['slow'];
+            }
+            if (activeBonuses['grow'] && Date.now() > activeBonuses['grow']) {
+                bird.radius = 25;
+                updateBirdSize();
+                delete activeBonuses['grow'];
+            }
+            if (activeBonuses['shield'] && Date.now() > activeBonuses['shield']) {
+                bird.shielded = false;
+                delete activeBonuses['shield'];
+                birdShield.visible = false;
+            }
+            if (activeBonuses['points'] && Date.now() > activeBonuses['points']) {
+                speedMultiplier = 1.0;
+                delete activeBonuses['points'];
+            }
+        }
+
+        // Update clouds position
+        function updateClouds() {
+            cloudGroup.children.forEach(cloud => {
+                cloud.position.x -= cloud.userData.speed * speedMultiplier;
+                if (cloud.position.x < -100) {
+                    cloud.position.x = container.clientWidth + 100;
+                    cloud.position.y = Math.random() * 300 + 50;
+                }
+            });
+        }
+
+        // Game loop with Three.js rendering
+        function gameLoop() {
+            requestAnimationFrame(gameLoop);
+
+            if (gameState === 'playing') {
+                updateGame();
+            }
+
+            updateThreeJS();
+        }
+
+        // Update Three.js scene
+        function updateThreeJS() {
+            // Animate bird wings
+            const time = Date.now() * 0.005;
+            if (birdMesh) {
+                birdWingLeft.rotation.x = -Math.PI / 4 + Math.sin(time) * 0.3;
+                birdWingRight.rotation.x = -Math.PI / 4 + Math.sin(time) * 0.3;
+            }
+
+            // Animate bonus items
+            bonusItems.forEach(item => {
+                item.mesh.rotation.y += item.rotationSpeed;
+                item.mesh.children[0].rotation.x += item.rotationSpeed;
+            });
+
+            // Update particles
+            updateParticles();
+
+            // Render scene
+            renderer.render(scene, camera);
+        }
+
+        // Main game update
+        function updateGame() {
+            if (gameState !== 'playing') return;
+
+            // Bird physics
+            bird.velocity += bird.gravity;
+            bird.y += bird.velocity;
+
+            // Clamp bird position
+            if (bird.y < bird.radius) {
+                bird.y = bird.radius;
+                bird.velocity = 0;
+            }
+            if (bird.y > container.clientHeight - bird.radius - 50) {
+                bird.y = container.clientHeight - bird.radius - 50;
+                bird.velocity = 0;
+                gameOver();
+            }
+
+            // Update bird mesh position
+            if (birdMesh) {
+                birdMesh.position.set(bird.x, bird.y, 0);
+
+                // Rotate based on velocity
+                const rotation = Math.min(Math.max(bird.velocity * 3, -45), 90);
+                birdMesh.rotation.z = rotation * Math.PI / 180;
+            }
+
+            // Update clouds
+            updateClouds();
+
+            // Spawn pipes and bonuses
+            frameCount++;
+            const currentSpawnRate = Math.max(100, spawnRate / speedMultiplier);
+
+            if (frameCount % Math.floor(currentSpawnRate) === 0) {
+                spawnPipe();
+            }
+
+            spawnBonus();
+
+            // Update pipes
+            pipes.forEach(pipe => {
+                pipe.x -= 5 * speedMultiplier;
+            });
+
+            // Remove off-screen pipes and count score
+            pipes = pipes.filter(pipe => {
+                if (pipe.x + pipeWidth < 0) {
+                    pipeGroup.remove(pipe.meshGroup.topPipe);
+                    pipeGroup.remove(pipe.meshGroup.topCap);
+                    pipeGroup.remove(pipe.meshGroup.bottomPipe);
+                    pipeGroup.remove(pipe.meshGroup.bottomCap);
+                    pipeGroup.remove(pipe.meshGroup.glow);
+                    return false;
+                }
+
+                if (!pipe.passed && pipe.x + pipeWidth < bird.x) {
+                    pipe.passed = true;
+                    const pointsMultiplier = activeBonuses['points'] ? 2 : 1;
+                    score += pointsMultiplier;
+                    scoreDisplay.textContent = score;
+                }
+                return true;
+            });
+
+            // Update bonus items
+            bonusItems = bonusItems.filter(item => {
+                item.mesh.position.x -= 5 * speedMultiplier;
+
+                // Collision detection with bonuses
+                const dx = bird.x - item.mesh.position.x;
+                const dy = bird.y - item.mesh.position.y;
+                const distance = Math.sqrt(dx * dx + dy * dy);
+
+                if (distance < bird.radius + 25) {
+                    activateBonus(item.type);
+                    scene.remove(item.mesh);
+                    return false;
+                }
+
+                return item.mesh.position.x > -50;
+            });
+
+            // Collision detection with pipes
+            pipes.forEach(pipe => {
+                if (bird.x + bird.radius > pipe.x &&
+                    bird.x - bird.radius < pipe.x + pipeWidth) {
+                    if (bird.y - bird.radius < pipe.topHeight ||
+                        bird.y + bird.radius > pipe.topHeight + pipeGap) {
+                        if (!bird.shielded) {
+                            gameOver();
+                        } else {
+                            bird.shielded = false;
+                            delete activeBonuses['shield'];
+                            birdShield.visible = false;
+                            const color = themeColors[userSettings.gameTheme].ground;
+                            createParticleExplosion(color, pipe.x, pipe.topHeight);
+                        }
+                    }
+                }
+            });
+
+            checkExpiredBonuses();
+        }
+
+        // Lives display
+        let livesDisplay = document.createElement('div');
+        livesDisplay.id = 'livesDisplay';
+        livesDisplay.style.cssText = 'position: absolute; top: 10px; left: 50%; transform: translateX(-50%); color: #ff4444; font-size: 32px; z-index: 10; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.5);';
+        document.getElementById('gameContainer').appendChild(livesDisplay);
+
+        function updateLivesDisplay() {
+            livesDisplay.textContent = '❤️'.repeat(bird.lives || 1);
+        }
+
+        // Draw game over screen with HTML overlay
+        function drawGameOver() {
+            const overlay = document.createElement('div');
+            overlay.id = 'gameOverOverlay';
+            overlay.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.7);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                color: white;
+            `;
+
+            const title = document.createElement('h1');
+            title.style.cssText = 'font-size: 72px; color: #FF6B35; margin-bottom: 20px;';
+            title.textContent = 'GAME OVER';
+            overlay.appendChild(title);
+
+            const scoreText = document.createElement('p');
+            scoreText.style.cssText = 'font-size: 48px; margin-bottom: 10px;';
+            scoreText.textContent = `Final Score: ${score}`;
+            overlay.appendChild(scoreText);
+
+            if (score > highScore) {
+                highScore = score;
+                localStorage.setItem('flappyHighScore', highScore);
+                const newRecord = document.createElement('p');
+                newRecord.style.cssText = 'font-size: 36px; color: #FFD700; margin-bottom: 20px;';
+                newRecord.textContent = '🏆 NEW HIGH SCORE! 🏆';
+                overlay.appendChild(newRecord);
+            } else {
+                const highScoreText = document.createElement('p');
+                highScoreText.style.cssText = 'font-size: 36px; color: #B0E0F9; margin-bottom: 20px;';
+                highScoreText.textContent = `High Score: ${highScore}`;
+                overlay.appendChild(highScoreText);
+            }
+
+            const restartText = document.createElement('p');
+            restartText.style.cssText = 'font-size: 32px; color: #FFD700;';
+            restartText.textContent = 'Press SPACE to restart';
+            overlay.appendChild(restartText);
+
+            document.getElementById('gameContainer').appendChild(overlay);
+        }
+
+        // Draw start screen with HTML overlay
+        function drawStartScreen() {
+            const overlay = document.createElement('div');
+            overlay.id = 'startOverlay';
+            overlay.style.cssText = `
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background: rgba(0, 0, 0, 0.5);
+                display: flex;
+                flex-direction: column;
+                justify-content: center;
+                align-items: center;
+                color: white;
+            `;
+
+            const title = document.createElement('h1');
+            title.style.cssText = 'font-size: 64px; color: #FFD700; margin-bottom: 20px;';
+            title.textContent = 'FLAPPY BIRD';
+            overlay.appendChild(title);
+
+            const startText = document.createElement('p');
+            startText.style.cssText = 'font-size: 36px; margin-bottom: 10px;';
+            startText.textContent = 'Press SPACE to start';
+            overlay.appendChild(startText);
+
+            const flyText = document.createElement('p');
+            flyText.style.cssText = 'font-size: 24px; color: #B0E0F9; margin-bottom: 10px;';
+            flyText.textContent = 'Click or press SPACE to fly';
+            overlay.appendChild(flyText);
+
+            const bonusesText = document.createElement('p');
+            bonusesText.style.cssText = 'font-size: 20px; color: #FF6B35; margin-bottom: 10px;';
+            bonusesText.textContent = 'Collect bonuses for special effects!';
+            overlay.appendChild(bonusesText);
+
+            const customText = document.createElement('p');
+            customText.style.cssText = 'font-size: 18px; color: #00d4ff; margin-bottom: 20px;';
+            customText.textContent = 'Click the gear icon ⚙️ to customize!';
+            overlay.appendChild(customText);
+
+            const highScoreText = document.createElement('p');
+            highScoreText.style.cssText = 'font-size: 32px; color: #FFD700;';
+            highScoreText.textContent = `High Score: ${highScore}`;
+            overlay.appendChild(highScoreText);
+
+            document.getElementById('gameContainer').appendChild(overlay);
+        }
+
+        // Game controls
+        function startGame() {
+            if (gameState === 'start' || gameState === 'gameover') {
+                resetGame();
+                gameState = 'playing';
+
+                // Remove overlays
+                const overlay = document.getElementById('startOverlay');
+                if (overlay) overlay.remove();
+            } else {
+                bird.velocity = bird.jumpStrength;
+            }
+        }
+
+        function resetGame() {
+            score = 0;
+            scoreDisplay.textContent = '0';
+            speedMultiplier = 1.0;
+            activeBonuses = {};
+            bird.lives = 1;
+            bird.radius = 25;
+            bird.y = container.clientHeight / 2;
+            bird.velocity = 0;
+            bird.rotation = 0;
+            bird.shielded = false;
+            pipes = [];
+            bonusItems = [];
+            particles = [];
+            frameCount = 0;
+            updateBonusesDisplay();
+            updateLivesDisplay();
+
+            // Clear pipe group
+            while (pipeGroup.children.length > 0) {
+                const child = pipeGroup.children[0];
+                pipeGroup.remove(child);
+                if (child.geometry) child.geometry.dispose();
+                if (child.material) child.material.dispose();
+            }
+
+            // Reset bird
+            updateBirdSize();
+        }
+
+        function gameOver() {
+            gameState = 'gameover';
+
+            if (bird.lives > 1) {
+                bird.lives--;
+                updateLivesDisplay();
+                setTimeout(() => {
+                    gameState = 'playing';
+                }, 1500);
+            } else {
+                drawGameOver();
+            }
+        }
+
+        // Settings functionality
+        function toggleSettings() {
+            const settings = document.getElementById('settings');
+            settings.classList.toggle('hidden');
+        }
+
+        // Apply settings changes
+        document.getElementById('birdColor').addEventListener('change', (e) => {
+            userSettings.birdColor = e.target.value;
+
+            // Update bird mesh color
+            if (birdMesh && birdMesh.children[0]) {
+                birdMesh.children[0].material.color.set(userSettings.birdColor);
+                birdMesh.children[2].material.color.set(userSettings.birdColor);
+            }
+        });
+
+        document.getElementById('gameTheme').addEventListener('change', (e) => {
+            userSettings.gameTheme = e.target.value;
+            initGround();
+            initClouds();
+        });
+
+        // Event listeners
+        canvas.addEventListener('click', startGame);
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                startGame();
+            }
+        });
+
+        // Touch support for mobile
+        canvas.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            startGame();
+        }, { passive: false });
+
+        // Initialize and start game
+        initThree();
+        updateLivesDisplay();
+        drawStartScreen();
+        gameLoop();
+    </script>
+</body>
+</html>

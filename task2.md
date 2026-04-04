@@ -1,6 +1,6 @@
 # project directory 
 
-* filename is : 'q3.5.28b_zed'
+* filename is : 'q3.5.28b_zed_q4_0_60k_fast'
 
 * /home/neo/Documents/flappy-birdZZZZs/
 
