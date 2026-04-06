@@ -1,0 +1,1052 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Flappy Bird 3D - WebGL Adventure</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #gameContainer {
+            position: relative;
+            box-shadow: 0 0 80px rgba(0, 255, 255, 0.5), 0 0 120px rgba(255, 0, 255, 0.4);
+            border-radius: 15px;
+            overflow: hidden;
+        }
+        #gameCanvas {
+            display: block;
+            background: linear-gradient(to bottom, #87CEEB 0%, #98D8E8 40%, #B2F4E6 70%, #8B4513 100%);
+        }
+        #ui {
+            position: absolute;
+            top: 15px;
+            left: 15px;
+            right: 15px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            pointer-events: none;
+        }
+        .score-box {
+            background: rgba(0, 0, 0, 0.7);
+            padding: 12px 25px;
+            border-radius: 12px;
+            color: white;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.8);
+            backdrop-filter: blur(10px);
+        }
+        .score-label {
+            font-size: 12px;
+            opacity: 0.8;
+            letter-spacing: 1px;
+        }
+        .score-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #FFD700;
+        }
+        #bonuses {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+            justify-content: flex-end;
+            max-width: 280px;
+        }
+        .bonus-indicator {
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+            animation: pulse 0.5s ease-in-out infinite alternate;
+        }
+        @keyframes pulse {
+            from { transform: scale(1); box-shadow: 0 0 10px currentColor; }
+            to { transform: scale(1.08); box-shadow: 0 0 20px currentColor; }
+        }
+        #message {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 42px;
+            font-weight: bold;
+            color: white;
+            text-shadow: 3px 3px 8px rgba(0,0,0,0.8);
+            text-align: center;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 25px 50px;
+            border-radius: 20px;
+            backdrop-filter: blur(10px);
+        }
+        #message small {
+            font-size: 18px;
+            font-weight: normal;
+            display: block;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+        #controls {
+            position: absolute;
+            bottom: 15px;
+            left: 15px;
+            background: rgba(0, 0, 0, 0.6);
+            padding: 12px 20px;
+            border-radius: 10px;
+            color: white;
+            font-size: 14px;
+        }
+        #controls kbd {
+            background: rgba(255, 255, 255, 0.3);
+            padding: 3px 8px;
+            border-radius: 5px;
+            font-family: monospace;
+        }
+        #settings {
+            position: absolute;
+            top: 60px;
+            right: 15px;
+            pointer-events: auto;
+        }
+        .setting-btn {
+            background: rgba(255, 255, 255, 0.9);
+            border: none;
+            padding: 10px 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.3s;
+        }
+        .setting-btn:hover {
+            background: white;
+            transform: scale(1.05);
+        }
+        #settingsPanel {
+            position: absolute;
+            top: 100px;
+            right: 15px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 20px;
+            border-radius: 12px;
+            display: none;
+            z-index: 100;
+        }
+        #settingsPanel.show {
+            display: block;
+        }
+        .setting-row {
+            margin: 12px 0;
+        }
+        .setting-row label {
+            display: inline-block;
+            width: 90px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .setting-row input[type="range"] {
+            width: 130px;
+        }
+    </style>
+</head>
+<body>
+    <div id="gameContainer">
+        <canvas id="gameCanvas" width="1080" height="720"></canvas>
+        <div id="ui">
+            <div class="score-box">
+                <div class="score-label">SCORE</div>
+                <div class="score-value" id="score">0</div>
+            </div>
+            <div class="score-box">
+                <div class="score-label">BEST</div>
+                <div class="score-value" id="bestScore">0</div>
+            </div>
+        </div>
+        <div id="bonuses"></div>
+        <div id="controls">
+            <kbd>SPACE</kbd> or <kbd>CLICK</kbd> to Jump | <kbd>R</kbd> to Reset
+        </div>
+        <div id="settings">
+            <button class="setting-btn" onclick="toggleSettings()">⚙️ Settings</button>
+        </div>
+        <div id="settingsPanel">
+            <h4 style="margin-bottom: 15px; color: #333;">Game Settings</h4>
+            <div class="setting-row">
+                <label>Gravity:</label>
+                <input type="range" id="gravitySlider" min="0.3" max="0.8" step="0.05" value="0.5">
+            </div>
+            <div class="setting-row">
+                <label>Speed:</label>
+                <input type="range" id="speedSlider" min="4" max="10" step="1" value="6">
+            </div>
+            <div class="setting-row">
+                <label>Pipe Gap:</label>
+                <input type="range" id="gapSlider" min="150" max="280" step="10" value="200">
+            </div>
+            <button class="setting-btn" onclick="resetSettings()">Reset Settings</button>
+        </div>
+        <div id="message">Press SPACE to Start!</div>
+    </div>
+
+    <!-- Load Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+    <script>
+        // ========== THREE.JS SETUP ==========
+        const canvas = document.getElementById('gameCanvas');
+        const scoreEl = document.getElementById('score');
+        const bestScoreEl = document.getElementById('bestScore');
+        const messageEl = document.getElementById('message');
+        const bonusesEl = document.getElementById('bonuses');
+        const settingsPanel = document.getElementById('settingsPanel');
+
+        // Scene setup
+        let scene, camera, renderer;
+        let bird, birdGroup;
+        let pipes = [];
+        let bonuses = [];
+        let particles = [];
+        let backgroundElements = [];
+
+        // Game state
+        let gameState = 'waiting';
+        let score = 0;
+        let bestScore = localStorage.getItem('flappy3DBestScore') || 0;
+        bestScoreEl.textContent = bestScore;
+
+        // Settings
+        let settings = {
+            gravity: 0.5,
+            gameSpeed: 6,
+            pipeGap: 200,
+            birdColor: '#FFD700'
+        };
+
+        // Bird physics
+        let birdY = 360;
+        let birdVelocity = 0;
+        let birdRotation = 0;
+
+        // Timing
+        let lastTime = 0;
+        let pipeTimer = 0;
+        let bonusTimer = 0;
+
+        // Active bonuses
+        let activeBonuses = [];
+        let doubleScoreMultiplier = 1;
+
+        // ========== INITIALIZATION ==========
+        function init() {
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x87CEEB);
+            scene.fog = new THREE.Fog(0x87CEEB, 500, 1500);
+
+            // Camera - Third person perspective
+            camera = new THREE.PerspectiveCamera(60, canvas.width / canvas.height, 0.1, 3000);
+            camera.position.set(-200, 0, 300);
+            camera.lookAt(100, 0, 0);
+
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: canvas,
+                antialias: true,
+                alpha: true
+            });
+            renderer.setSize(canvas.width, canvas.height);
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+            scene.add(ambientLight);
+
+            const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+            directionalLight.position.set(-200, 500, 300);
+            directionalLight.castShadow = true;
+            directionalLight.shadow.mapSize.width = 2048;
+            directionalLight.shadow.mapSize.height = 2048;
+            directionalLight.shadow.camera.near = 0.5;
+            directionalLight.shadow.camera.far = 1000;
+            directionalLight.shadow.camera.left = -500;
+            directionalLight.shadow.camera.right = 500;
+            directionalLight.shadow.camera.top = 500;
+            directionalLight.shadow.camera.bottom = -500;
+            scene.add(directionalLight);
+
+            // Create game objects
+            createBird();
+            createBackground();
+            createGround();
+
+            // Start animation loop
+            requestAnimationFrame(animate);
+        }
+
+        // ========== BIRD CREATION ==========
+        function createBird() {
+            birdGroup = new THREE.Group();
+
+            // Main body - rounded capsule shape
+            const bodyGeometry = new THREE.SphereGeometry(20, 32, 32);
+            const bodyMaterial = new THREE.MeshPhongMaterial({ 
+                color: settings.birdColor,
+                shininess: 30,
+                specular: 0x444444
+            });
+            const body = new THREE.Mesh(bodyGeometry, bodyMaterial);
+            body.scale.set(1, 0.8, 1.2);
+            body.castShadow = true;
+            birdGroup.add(body);
+
+            // Eye
+            const eyeGeometry = new THREE.SphereGeometry(6, 16, 16);
+            const eyeMaterial = new THREE.MeshPhongMaterial({ color: 0xffffff });
+            const eye = new THREE.Mesh(eyeGeometry, eyeMaterial);
+            eye.position.set(12, -4, 15);
+            birdGroup.add(eye);
+
+            const pupilGeometry = new THREE.SphereGeometry(3, 16, 16);
+            const pupilMaterial = new THREE.MeshPhongMaterial({ color: 0x000000 });
+            const pupil = new THREE.Mesh(pupilGeometry, pupilMaterial);
+            pupil.position.set(14, -4, 17);
+            birdGroup.add(pupil);
+
+            // Beak
+            const beakGeometry = new THREE.ConeGeometry(5, 12, 16);
+            const beakMaterial = new THREE.MeshPhongMaterial({ color: 0xFF6B35 });
+            const beak = new THREE.Mesh(beakGeometry, beakMaterial);
+            beak.rotation.x = Math.PI / 2;
+            beak.position.set(22, 0, 14);
+            birdGroup.add(beak);
+
+            // Wing (animated)
+            const wingGeometry = new THREE.SphereGeometry(8, 16, 16);
+            const wingMaterial = new THREE.MeshPhongMaterial({ color: 0xFFA500 });
+            wing = new THREE.Mesh(wingGeometry, wingMaterial);
+            wing.scale.set(1, 0.4, 1.2);
+            wing.position.set(-8, 0, 12);
+            birdGroup.add(wing);
+            
+            // Store wing reference for animation
+            bird.wing = wing;
+
+            // Tail
+            const tailGeometry = new THREE.BufferGeometry();
+            const tailVertices = new Float32Array([
+                -15, -10, 18,
+                -20, 0, 22,
+                -15, 10, 18
+            ]);
+            tailGeometry.setAttribute('position', new THREE.BufferAttribute(tailVertices, 3));
+            const tailMaterial = new THREE.MeshPhongMaterial({ color: 0xFFD700, side: THREE.DoubleSide });
+            const tail = new THREE.Mesh(tailGeometry, tailMaterial);
+            birdGroup.add(tail);
+
+            // Shield effect mesh (invisible, for collision)
+            const shieldGeometry = new THREE.SphereGeometry(25, 16, 16);
+            const shieldMaterial = new THREE.MeshBasicMaterial({ visible: false });
+            const shieldMesh = new THREE.Mesh(shieldGeometry, shieldMaterial);
+            birdGroup.add(shieldMesh);
+
+            scene.add(birdGroup);
+            bird = {
+                group: birdGroup,
+                wing: wing,
+                wingAngle: 0,
+                trail: [],
+                shieldMesh: shieldMesh
+            };
+        }
+
+        // ========== PIPE CREATION ==========
+        function createPipe(x, topHeight) {
+            const pipeGroup = new THREE.Group();
+            
+            // Top pipe
+            const topPipeGeometry = new THREE.CylinderGeometry(35, 35, topHeight, 32, 1, true);
+            const pipeMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x2ECC71,
+                side: THREE.DoubleSide
+            });
+            const topPipe = new THREE.Mesh(topPipeGeometry, pipeMaterial);
+            topPipe.position.y = -topHeight / 2 + 100;
+            topPipe.castShadow = true;
+            topPipe.receiveShadow = true;
+            pipeGroup.add(topPipe);
+
+            // Top pipe cap
+            const capGeometry = new THREE.CylinderGeometry(40, 40, 30, 32);
+            const capMaterial = new THREE.MeshPhongMaterial({ color: 0x27AE60 });
+            const topCap = new THREE.Mesh(capGeometry, capMaterial);
+            topCap.position.y = -topHeight + 15;
+            topCap.castShadow = true;
+            pipeGroup.add(topCap);
+
+            // Bottom pipe
+            const bottomY = topHeight + settings.pipeGap;
+            const bottomHeight = canvas.height - bottomY;
+            const bottomPipeGeometry = new THREE.CylinderGeometry(35, 35, bottomHeight, 32, 1, true);
+            const bottomPipe = new THREE.Mesh(bottomPipeGeometry, pipeMaterial);
+            bottomPipe.position.y = bottomY + bottomHeight / 2 - 100;
+            bottomPipe.castShadow = true;
+            bottomPipe.receiveShadow = true;
+            pipeGroup.add(bottomPipe);
+
+            // Bottom pipe cap
+            const bottomCap = new THREE.Mesh(capGeometry, capMaterial);
+            bottomCap.position.y = bottomY + 15;
+            bottomCap.castShadow = true;
+            pipeGroup.add(bottomCap);
+
+            // Pipe highlights (rings)
+            for (let i = 0; i < 3; i++) {
+                const ringGeometry = new THREE.TorusGeometry(38, 2, 16, 32);
+                const ringMaterial = new THREE.MeshPhongMaterial({ color: 0x1E8449 });
+                const ring1 = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring1.rotation.y = Math.PI / 2;
+                ring1.position.set(35, topPipe.position.y + i * 60 - 30, 0);
+                pipeGroup.add(ring1);
+
+                const ring2 = new THREE.Mesh(ringGeometry, ringMaterial);
+                ring2.rotation.y = Math.PI / 2;
+                ring2.position.set(-35, topPipe.position.y + i * 60 - 30, 0);
+                pipeGroup.add(ring2);
+            }
+
+            scene.add(pipeGroup);
+            
+            return {
+                group: pipeGroup,
+                x: x,
+                top: topHeight,
+                passed: false,
+                width: 70
+            };
+        }
+
+        // ========== BONUS CREATION ==========
+        function createBonus(x, y, type) {
+            const bonusData = bonusTypes.find(b => b.type === type);
+            
+            const bonusGroup = new THREE.Group();
+            
+            // Main sphere
+            const geometry = new THREE.SphereGeometry(20, 32, 32);
+            const material = new THREE.MeshPhongMaterial({ 
+                color: bonusData.color,
+                emissive: bonusData.color,
+                emissiveIntensity: 0.5,
+                transparent: true,
+                opacity: 0.9
+            });
+            const sphere = new THREE.Mesh(geometry, material);
+            bonusGroup.add(sphere);
+
+            // Inner glow
+            const innerGeometry = new THREE.SphereGeometry(12, 16, 16);
+            const innerMaterial = new THREE.MeshBasicMaterial({ 
+                color: 0xffffff,
+                transparent: true,
+                opacity: 0.4
+            });
+            const innerSphere = new THREE.Mesh(innerGeometry, innerMaterial);
+            bonusGroup.add(innerSphere);
+
+            // Symbol (simple representation)
+            const symbolGeometry = createBonusSymbol(type);
+            const symbolMaterial = new THREE.MeshBasicMaterial({ color: 0xffffff });
+            const symbol = new THREE.Mesh(symbolGeometry, symbolMaterial);
+            symbol.position.z = 18;
+            bonusGroup.add(symbol);
+
+            // Glow ring
+            const ringGeometry = new THREE.TorusGeometry(25, 2, 16, 32);
+            const ringMaterial = new THREE.MeshBasicMaterial({ 
+                color: bonusData.color,
+                transparent: true,
+                opacity: 0.6
+            });
+            const ring = new THREE.Mesh(ringGeometry, ringMaterial);
+            bonusGroup.add(ring);
+
+            scene.add(bonusGroup);
+
+            return {
+                group: bonusGroup,
+                x: x,
+                y: y,
+                ...bonusData,
+                rotationSpeed: 0.02 + Math.random() * 0.03
+            };
+        }
+
+        // Create symbol geometry based on bonus type
+        function createBonusSymbol(type) {
+            switch(type) {
+                case 'speed':
+                    // Lightning bolt shape
+                    const lightningGeometry = new THREE.BufferGeometry();
+                    const lightningVertices = new Float32Array([
+                        0, 15, 0, -5, 5, 0, 0, 8, 0, -3, 0, 0, 0, -5, 0, 5, -12, 0
+                    ]);
+                    lightningGeometry.setAttribute('position', new THREE.BufferAttribute(lightningVertices, 3));
+                    return lightningGeometry;
+                case 'slow':
+                    // Snail shell spiral
+                    const snailGeometry = new THREE.TorusKnotGeometry(8, 2, 64, 8);
+                    return snailGeometry;
+                case 'magnet':
+                    // Magnet U-shape
+                    const magnetGeometry = new THREE.BufferGeometry();
+                    const magnetVertices = new Float32Array([
+                        -10, 10, 0, -10, -10, 0, 0, -10, 0, 0, 10, 0
+                    ]);
+                    magnetGeometry.setAttribute('position', new THREE.BufferAttribute(magnetVertices, 3));
+                    return magnetGeometry;
+                case 'double':
+                    // Fire flame
+                    const fireGeometry = new THREE.BufferGeometry();
+                    const fireVertices = new Float32Array([
+                        0, 15, 0, -8, 8, 0, 0, 0, 0, 8, 8, 0, 0, -5, 0
+                    ]);
+                    fireGeometry.setAttribute('position', new THREE.BufferAttribute(fireVertices, 3));
+                    return fireGeometry;
+                case 'shield':
+                    // Shield shape
+                    const shieldGeometry = new THREE.BufferGeometry();
+                    const shieldVertices = new Float32Array([
+                        0, 15, 0, -12, 8, 0, -12, -12, 0, 12, -12, 0, 12, 8, 0
+                    ]);
+                    shieldGeometry.setAttribute('position', new THREE.BufferAttribute(shieldVertices, 3));
+                    return shieldGeometry;
+                default:
+                    const sphere = new THREE.SphereGeometry(5, 16, 16);
+                    return sphere;
+            }
+        }
+
+        // ========== PARTICLE SYSTEM ==========
+        function createParticles(x, y, z, color, count = 20) {
+            for (let i = 0; i < count; i++) {
+                const geometry = new THREE.SphereGeometry(3 + Math.random() * 4, 8, 8);
+                const material = new THREE.MeshBasicMaterial({ 
+                    color: color,
+                    transparent: true,
+                    opacity: 1
+                });
+                const particle = new THREE.Mesh(geometry, material);
+                
+                particle.position.set(
+                    x + (Math.random() - 0.5) * 30,
+                    y + (Math.random() - 0.5) * 30,
+                    z + (Math.random() - 0.5) * 30
+                );
+                
+                particle.userData = {
+                    velocity: new THREE.Vector3(
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 10,
+                        (Math.random() - 0.5) * 10
+                    ),
+                    life: 1
+                };
+                
+                scene.add(particle);
+                particles.push(particle);
+            }
+        }
+
+        // ========== BACKGROUND CREATION ==========
+        function createBackground() {
+            // Sky gradient (handled by scene background and fog)
+            
+            // Clouds
+            for (let i = 0; i < 15; i++) {
+                const cloudGroup = new THREE.Group();
+                
+                const cloudGeometry = new THREE.SphereGeometry(30 + Math.random() * 40, 16, 16);
+                const cloudMaterial = new THREE.MeshPhongMaterial({ 
+                    color: 0xffffff,
+                    transparent: true,
+                    opacity: 0.8
+                });
+                
+                const numPuffs = 3 + Math.floor(Math.random() * 3);
+                for (let j = 0; j < numPuffs; j++) {
+                    const puff = new THREE.Mesh(cloudGeometry, cloudMaterial.clone());
+                    puff.position.set(j * 25 - 40, Math.random() * 10 - 5, Math.random() * 10 - 5);
+                    puff.scale.set(1, 0.8, 0.6 + Math.random() * 0.4);
+                    cloudGroup.add(puff);
+                }
+                
+                cloudGroup.position.set(
+                    Math.random() * 1000 - 200,
+                    200 + Math.random() * 150,
+                    Math.random() * 400 - 200
+                );
+                
+                scene.add(cloudGroup);
+                backgroundElements.push({
+                    type: 'cloud',
+                    group: cloudGroup,
+                    speed: 0.5 + Math.random() * 0.5
+                });
+            }
+
+            // Mountains in the distance
+            for (let i = 0; i < 20; i++) {
+                const height = 200 + Math.random() * 300;
+                const mountainGeometry = new THREE.ConeGeometry(150 + Math.random() * 100, height, 4);
+                const mountainMaterial = new THREE.MeshPhongMaterial({ 
+                    color: new THREE.Color().setHSL(0.6, 0.3, 0.3 + Math.random() * 0.2),
+                    side: THREE.DoubleSide
+                });
+                
+                const mountain = new THREE.Mesh(mountainGeometry, mountainMaterial);
+                mountain.position.set(
+                    i * 200 - 500,
+                    height / 2 - 100,
+                    300 + Math.random() * 200
+                );
+                mountain.rotation.y = Math.random() * Math.PI;
+                
+                scene.add(mountain);
+                backgroundElements.push({
+                    type: 'mountain',
+                    mesh: mountain,
+                    speed: 0.2
+                });
+            }
+
+            // Stars (night effect)
+            const starsGeometry = new THREE.BufferGeometry();
+            const starVertices = [];
+            for (let i = 0; i < 200; i++) {
+                starVertices.push(
+                    Math.random() * 1500 - 750,
+                    Math.random() * 400 + 100,
+                    Math.random() * 600 - 300
+                );
+            }
+            starsGeometry.setAttribute('position', new THREE.Float32BufferAttribute(starVertices, 3));
+            const starsMaterial = new THREE.PointsMaterial({ color: 0xffffff, size: 2 });
+            const stars = new THREE.Points(starsGeometry, starsMaterial);
+            scene.add(stars);
+        }
+
+        // ========== GROUND CREATION ==========
+        function createGround() {
+            const groundGeometry = new THREE.PlaneGeometry(3000, 200, 50, 10);
+            
+            // Create grass and dirt texture using vertices
+            const positions = groundGeometry.attributes.position.array;
+            for (let i = 0; i < positions.length; i += 3) {
+                positions[i + 2] = Math.random() * 5; // Slight elevation variation
+            }
+            
+            groundGeometry.computeVertexNormals();
+            
+            const groundMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x8B4513,
+                side: THREE.DoubleSide,
+                shininess: 10
+            });
+            
+            const ground = new THREE.Mesh(groundGeometry, groundMaterial);
+            ground.rotation.x = -Math.PI / 2;
+            ground.position.set(500, -60, 0);
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // Grass layer
+            const grassGeometry = new THREE.PlaneGeometry(3000, 200, 50, 10);
+            const grassMaterial = new THREE.MeshPhongMaterial({ 
+                color: 0x2ECC71,
+                side: THREE.DoubleSide
+            });
+            
+            const grass = new THREE.Mesh(grassGeometry, grassMaterial);
+            grass.rotation.x = -Math.PI / 2;
+            grass.position.set(500, -58, 0);
+            grass.receiveShadow = true;
+            scene.add(grass);
+        }
+
+        // ========== BONUS TYPES ==========
+        const bonusTypes = [
+            { type: 'speed', color: 0xFF6B35, multiplier: 1.5, duration: 10000 },
+            { type: 'slow', color: 0x4ECDC4, multiplier: 0.6, duration: 8000 },
+            { type: 'magnet', color: 0xFFE66D, radius: 250, duration: 12000 },
+            { type: 'double', color: 0x9B59B6, multiplier: 2, duration: 15000 },
+            { type: 'shield', color: 0x3498DB, invincible: true, duration: 7000 }
+        ];
+
+        // ========== UPDATE FUNCTIONS ==========
+        function update(deltaTime) {
+            if (gameState !== 'playing') return;
+
+            // Bird physics
+            birdVelocity += settings.gravity;
+            birdY -= birdVelocity;
+            
+            // Apply bonuses
+            let currentSpeed = settings.gameSpeed;
+            doubleScoreMultiplier = 1;
+            
+            activeBonuses.forEach(bonus => {
+                if (bonus.type === 'speed') {
+                    currentSpeed *= bonus.multiplier;
+                } else if (bonus.type === 'slow') {
+                    currentSpeed *= bonus.multiplier;
+                } else if (bonus.type === 'double') {
+                    doubleScoreMultiplier = bonus.multiplier;
+                }
+            });
+
+            // Bird position update
+            bird.group.position.y = birdY;
+            
+            // Bird rotation based on velocity
+            birdRotation = Math.min(Math.max(birdVelocity * 3, -45), 70);
+            bird.group.rotation.z = THREE.MathUtils.degToRad(birdRotation);
+
+            // Wing animation
+            bird.wingAngle += 0.2;
+            bird.wing.rotation.x = Math.sin(bird.wingAngle) * 0.8 - 0.5;
+
+            // Pipe spawning
+            pipeTimer += deltaTime;
+            const spawnInterval = 140 / (currentSpeed / settings.gameSpeed);
+            
+            if (pipeTimer >= spawnInterval) {
+                const minHeight = 120;
+                const maxHeight = canvas.height - settings.pipeGap - minHeight - 60;
+                const topHeight = minHeight + Math.random() * (maxHeight - minHeight);
+                
+                pipes.push(createPipe(1200, topHeight));
+                pipeTimer = 0;
+            }
+
+            // Update pipes
+            pipes.forEach(pipe => {
+                pipe.x -= currentSpeed;
+                pipe.group.position.x = pipe.x;
+                
+                // Score when passing
+                if (!pipe.passed && pipe.x + pipe.width < bird.group.position.x - 20) {
+                    pipe.passed = true;
+                    score += Math.floor(10 * doubleScoreMultiplier);
+                    scoreEl.textContent = score;
+                    
+                    // Score particles
+                    createParticles(pipe.x, birdY, 0xFFD700, 10);
+                }
+            });
+
+            // Remove off-screen pipes
+            pipes = pipes.filter(pipe => pipe.x > -200);
+
+            // Bonus spawning
+            bonusTimer += deltaTime;
+            if (bonusTimer >= 300 && bonuses.length < 4) {
+                const type = bonusTypes[Math.floor(Math.random() * bonusTypes.length)].type;
+                bonuses.push(createBonus(1200, 150 + Math.random() * 400, type));
+                bonusTimer = 0;
+            }
+
+            // Update bonuses with magnet effect
+            const magnetBonus = activeBonuses.find(b => b.type === 'magnet');
+            
+            bonuses.forEach((bonus, index) => {
+                bonus.x -= currentSpeed * 0.6;
+                bonus.group.position.x = bonus.x;
+                bonus.group.position.y = bonus.y;
+                
+                // Rotation animation
+                bonus.group.rotation.y += bonus.rotationSpeed;
+
+                // Magnet pull
+                if (magnetBonus && magnetBonus.timeRemaining > 0) {
+                    const dx = bird.group.position.x - bonus.x;
+                    const dy = birdY - bonus.y;
+                    const distance = Math.sqrt(dx*dx + dy*dy);
+                    
+                    if (distance < magnetBonus.radius) {
+                        bonus.x += dx * 0.03;
+                        bonus.y += dy * 0.03;
+                        bonus.group.position.x = bonus.x;
+                        bonus.group.position.y = bonus.y;
+                    }
+                }
+
+                // Collision detection (simplified sphere collision)
+                const dx = bird.group.position.x - bonus.x;
+                const dy = birdY - bonus.y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+                
+                if (distance < 45) {
+                    activateBonus(bonus);
+                    scene.remove(bonus.group);
+                    bonuses.splice(index, 1);
+                    createParticles(bonus.x, bonus.y, bonus.color, 20);
+                }
+            });
+
+            // Update active bonuses
+            activeBonuses.forEach((bonus, index) => {
+                bonus.timeRemaining -= deltaTime;
+                if (bonus.timeRemaining <= 0) {
+                    activeBonuses.splice(index, 1);
+                }
+            });
+
+            // Update background elements (parallax)
+            backgroundElements.forEach(element => {
+                element.group.position.x += element.speed * currentSpeed * 0.3;
+                if (element.group.position.x > 600) {
+                    element.group.position.x = -1000;
+                }
+            });
+
+            // Update particles
+            particles.forEach((particle, index) => {
+                particle.position.add(particle.userData.velocity);
+                particle.userData.velocity.y -= 0.2; // Gravity
+                particle.life -= 0.015;
+                
+                if (particle.life <= 0) {
+                    scene.remove(particle);
+                    particles.splice(index, 1);
+                } else {
+                    particle.material.opacity = particle.life;
+                }
+            });
+
+            // Collision detection
+            const birdBottom = birdY + 25;
+            const birdTop = birdY - 25;
+            
+            // Floor collision
+            if (birdBottom >= canvas.height - 60) {
+                gameOver();
+            }
+            
+            // Ceiling collision
+            if (birdTop <= 0) {
+                birdY = 25;
+                birdVelocity = 0;
+            }
+
+            // Pipe collision
+            const shieldBonus = activeBonuses.find(b => b.type === 'shield');
+            
+            pipes.forEach(pipe => {
+                const padding = shieldBonus && shieldBonus.timeRemaining > 0 ? 15 : 8;
+                
+                if (bird.group.position.x - padding < pipe.x + pipe.width &&
+                    bird.group.position.x + padding > pipe.x) {
+                    if (birdTop < pipe.top || birdBottom > pipe.top + settings.pipeGap) {
+                        if (shieldBonus && shieldBonus.timeRemaining > 0) {
+                            activeBonuses = activeBonuses.filter(b => b.type !== 'shield');
+                            createParticles(bird.group.position.x, birdY, 0x3498DB, 25);
+                            messageEl.textContent = '🛡️ Shield Broken!';
+                            setTimeout(() => {
+                                if (gameState === 'playing') messageEl.textContent = '';
+                            }, 1500);
+                        } else {
+                            gameOver();
+                        }
+                    }
+                }
+            });
+        }
+
+        // ========== BONUS ACTIVATION ==========
+        function activateBonus(bonus) {
+            activeBonuses.push({
+                type: bonus.type,
+                multiplier: bonus.multiplier,
+                radius: bonus.radius,
+                invincible: bonus.invincible,
+                timeRemaining: bonus.duration
+            });
+            updateBonusUI();
+            
+            // Visual feedback
+            const names = {
+                'speed': 'SPEED BOOST!',
+                'slow': 'SLOW MOTION!',
+                'magnet': 'MAGNET ON!',
+                'double': 'DOUBLE SCORE!',
+                'shield': 'SHIELD ACTIVE!'
+            };
+            
+            messageEl.innerHTML = `<span style="font-size: 56px">${getBonusSymbol(bonus.type)}</span><br>${names[bonus.type]}`;
+            setTimeout(() => {
+                if (gameState === 'playing') messageEl.textContent = '';
+            }, 1500);
+        }
+
+        function getBonusSymbol(type) {
+            const symbols = {
+                'speed': '⚡',
+                'slow': '🐌',
+                'magnet': '🧲',
+                'double': '🔥',
+                'shield': '🛡️'
+            };
+            return symbols[type] || '⭐';
+        }
+
+        // ========== UI UPDATE ==========
+        function updateBonusUI() {
+            bonusesEl.innerHTML = '';
+            activeBonuses.forEach(bonus => {
+                const indicator = document.createElement('div');
+                indicator.className = 'bonus-indicator';
+                
+                const names = {
+                    'speed': 'SPEED',
+                    'slow': 'SLOW MOTION',
+                    'magnet': 'MAGNET',
+                    'double': 'DOUBLE SCORE',
+                    'shield': 'SHIELD'
+                };
+                
+                const timeLeft = Math.ceil(bonus.timeRemaining / 1000);
+                indicator.textContent = names[bonus.type] + (bonus.type !== 'shield' ? ` ${timeLeft}s` : '');
+                
+                const colors = {
+                    'speed': '#FF6B35',
+                    'slow': '#4ECDC4',
+                    'magnet': '#FFE66D',
+                    'double': '#9B59B6',
+                    'shield': '#3498DB'
+                };
+                
+                indicator.style.backgroundColor = colors[bonus.type] || '#fff';
+                bonusesEl.appendChild(indicator);
+            });
+        }
+
+        // ========== GAME OVER ==========
+        function gameOver() {
+            gameState = 'gameover';
+            
+            if (score > bestScore) {
+                bestScore = score;
+                localStorage.setItem('flappy3DBestScore', bestScore);
+                bestScoreEl.textContent = bestScore;
+                messageEl.innerHTML = `🏆 NEW RECORD!<br><span style="font-size: 48px">${score}</span><small>Press SPACE to play again</small>`;
+            } else {
+                messageEl.innerHTML = `Game Over!<br><span style="font-size: 48px">${score}</span><small>Press SPACE to play again</small>`;
+            }
+            
+            // Explosion particles
+            createParticles(bird.group.position.x, birdY, settings.birdColor, 40);
+        }
+
+        // ========== RESET GAME ==========
+        function resetGame() {
+            birdY = 360;
+            birdVelocity = 0;
+            birdRotation = 0;
+            
+            // Remove all pipes
+            pipes.forEach(pipe => scene.remove(pipe.group));
+            pipes = [];
+            
+            // Remove all bonuses
+            bonuses.forEach(bonus => scene.remove(bonus.group));
+            bonuses = [];
+            
+            activeBonuses = [];
+            score = 0;
+            scoreEl.textContent = '0';
+            pipeTimer = 0;
+            bonusTimer = 0;
+            updateBonusUI();
+        }
+
+        // ========== ANIMATION LOOP ==========
+        function animate(time) {
+            requestAnimationFrame(animate);
+            
+            const deltaTime = time - lastTime;
+            lastTime = time;
+            
+            update(deltaTime);
+            renderer.render(scene, camera);
+        }
+
+        // ========== INPUT HANDLING ==========
+        function handleInput() {
+            if (gameState === 'waiting' || gameState === 'gameover') {
+                gameState = 'playing';
+                messageEl.textContent = '';
+                if (gameState === 'gameover') {
+                    resetGame();
+                }
+            } else {
+                birdVelocity = -10; // Jump strength
+            }
+        }
+
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                handleInput();
+            } else if (e.code === 'KeyR') {
+                resetGame();
+            }
+        });
+
+        canvas.addEventListener('click', handleInput);
+
+        // ========== SETTINGS FUNCTIONS ==========
+        function toggleSettings() {
+            settingsPanel.classList.toggle('show');
+        }
+
+        document.getElementById('gravitySlider').addEventListener('input', (e) => {
+            settings.gravity = parseFloat(e.target.value);
+        });
+
+        document.getElementById('speedSlider').addEventListener('input', (e) => {
+            settings.gameSpeed = parseInt(e.target.value);
+        });
+
+        document.getElementById('gapSlider').addEventListener('input', (e) => {
+            settings.pipeGap = parseInt(e.target.value);
+        });
+
+        function resetSettings() {
+            settings.gravity = 0.5;
+            settings.gameSpeed = 6;
+            settings.pipeGap = 200;
+            document.getElementById('gravitySlider').value = 0.5;
+            document.getElementById('speedSlider').value = 6;
+            document.getElementById('gapSlider').value = 200;
+        }
+
+        // ========== START ==========
+        init();
+    </script>
+</body>
+</html>

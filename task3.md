@@ -1,6 +1,6 @@
 # project directory 
 
-* filename is : 'Qwen3.5-35B-A3B-Q6_K.gguf_ctx-size-150000--ngl-auto--t-22_batch-size-524_cache-type-k-q8_0_cache-type-v-q8_0_temp-0.7_top-p-0.8_top-k-20_min-p-0.0_presence-penalty-1.5_repeat-penalty-1.0--flash-attn-on'
+* filename is : ''
 
 * /home/neo/Documents/Flappy-bird-benchmark
 
@@ -25,7 +25,4 @@ In order for the user to choose the final result, please follow this process, ke
 	* additional powers are welcome
   * then review it functionally and technically. Consider cosmetic and functional variations that could make this game more unique and fun.
   * Commit and push [filename].2-variation.html. 
-* 3) this version should not be based on the code from the 2 first ones. this time it's a 3D flappy bird, 3rd person. File name is [filename].3-webGL.html                     
-	* Rethink the whole game, take the best ideas of previous versions, but this time use ThreeJS / webGL for enhanced UX. Make extensive use of functions. Ensure the game is playable.
-	* plan extensively before implementation, then proceed.
-	* Commit and push the produced files.
+
