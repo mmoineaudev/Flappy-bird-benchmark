@@ -1,6 +1,6 @@
 # project directory 
 
-* filename is : ''
+* filename is : 'lol2'
 
 * /home/neo/Documents/Flappy-bird-benchmark
 
@@ -24,5 +24,4 @@ In order for the user to choose the final result, please follow this process, ke
 	* user personalisation is welcome.
 	* additional powers are welcome
   * then review it functionally and technically. Consider cosmetic and functional variations that could make this game more unique and fun.
-  * Commit and push [filename].2-variation.html. 
-
+  * Commit and push [filename].2-variation.html.
