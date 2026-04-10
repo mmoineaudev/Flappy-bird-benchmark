@@ -49,7 +49,6 @@
     </div>
     <div id="overlay"></div>
 
-    <!-- Three.js CDN -->
     <script type="importmap">
         {
             "imports": {
@@ -68,7 +67,7 @@
         let GRID_HEIGHT = 40;
         let BIRTH_RULE = [3];
         let SURVIVAL_RULE = [2, 3];
-        let SIM_SPEED = 10; // updates per second
+        let SIM_SPEED = 10;
         let lastUpdateTime = 0;
 
         // --- State ---
@@ -82,6 +81,7 @@
         scene.fog = new THREE.FogExp2(0x0a0a0f, 0.015);
 
         const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        // Center the camera on the grid
         camera.position.set(GRID_WIDTH/2, GRID_HEIGHT/2, GRID_WIDTH);
 
         const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -92,23 +92,23 @@
         const controls = new OrbitControls(camera, renderer.domElement);
         controls.enableDamping = true;
 
-        // Lighting
-        const ambientLight = new THREE.AmbientLight(0x404040, 2);
+        // Lighting (Used for the grid and potential other elements)
+        const ambientLight = new THREE.AmbientLight(0xffffff, 0.5);
         scene.add(ambientLight);
 
-        // Grid/Cell Rendering using InstancedMesh for performance
-        const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.1);
-        const material = new THREE.MeshStandardMaterial({
-            emissiveIntensity: 2,
-            roughness: 0.1,
-            metalness: 0.8
+        // Cell Rendering using InstancedMesh
+        const geometry = new THREE.BoxGeometry(0.8, 0.8, 0.2);
+        // Use MeshBasicMaterial for "Neon" effect (doesn't require light to be visible)
+        const material = new THREE.MeshBasicMaterial({
+            transparent: true,
+            opacity: 1.0
         });
         
         const instancedMesh = new THREE.InstancedMesh(geometry, material, GRID_WIDTH * GRID_HEIGHT);
         instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
         scene.add(instancedMesh);
 
-        // Helper for visual effects: A plane with grid lines
+        // Grid Plane
         const gridHelper = new THREE.GridHelper(GRID_WIDTH, GRID_WIDTH, 0x00ffff, 0x222233);
         gridHelper.position.set(GRID_WIDTH/2 - 0.5, GRID_HEIGHT/2 - 0.5, -0.1);
         gridHelper.rotation.x = Math.PI / 2;
@@ -174,21 +174,18 @@
                 for (let x = 0; x < GRID_WIDTH; x++) {
                     if (grid[y][x] === 1) {
                         dummy.position.set(x, y, 0);
+                        dummy.scale.set(1, 1, 1);
                         dummy.updateMatrix();
                         instancedMesh.setMatrixAt(idx, dummy.matrix);
 
-                        // Dynamic color cycling
-                        const hue = (Date.now() * 0.001 + (x/GRID_WIDTH)) % 1;
-                        color.setHSL(hue, 1.0, 0.5);
-                        // Neon colors: Cyan/Magenta/Purple cycle
-                        // For simplicity, let's use a more predictable neon pattern
+                        // Neon color cycling
                         if (x % 2 === 0) color.setHex(0x00ffff); // Cyan
                         else if (y % 2 === 0) color.setHex(0xff00ff); // Magenta
                         else color.setHex(0x9d4edd); // Purple
 
                         instancedMesh.setColorAt(idx, color);
                     } else {
-                        // Hide inactive cells by scaling to zero
+                        // Hide inactive cells
                         dummy.scale.set(0, 0, 0);
                         dummy.updateMatrix();
                         instancedMesh.setMatrixAt(idx, dummy.matrix);
@@ -210,9 +207,6 @@
             mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
             raycaster.setFromCamera(mouse, camera);
 
-            // Intersect with the grid plane (represented by the grid helper's position/rotation)
-            // For simplicity, we can check intersection with a large invisible plane or just math
-            // Let's use the grid helper's logic for bounds.
             const intersects = raycaster.intersectObject(gridHelper);
             if (intersects.length > 0) {
                 const pt = intersects[0].point;
