@@ -54,7 +54,7 @@
         const PIPE_GAP = 160;
 
         // Assets (Procedural)
-        const bird = {
+        const birdData = {
             x: 50,
             y: 300,
             velocity: 0,
@@ -62,7 +62,7 @@
             color: '#f7d308',
             eyeColor: 'white',
             beakColor: '#f75a08',
-            draw() {
+            draw(ctx) {
                 ctx.save();
                 ctx.translate(this.x, this.y);
                 // Rotate based on velocity
@@ -108,7 +108,7 @@
 
                 ctx.restore();
             },
-            update() {
+            update(ctx) {
                 this.velocity += GRAVITY;
                 this.y += this.velocity;
 
@@ -126,6 +126,8 @@
                 this.velocity = 0;
             }
         };
+
+        const bird = birdData;
 
         let pipes = [];
 
@@ -223,7 +225,7 @@
             if (gameState !== 'PLAYING') return;
 
             frameCount++;
-            bird.update();
+            bird.update(ctx);
             spawnPipe();
 
             for (let i = pipes.length - 1; i >= 0; i--) {
@@ -248,7 +250,7 @@
             drawBackground();
 
             pipes.forEach(p => p.draw());
-            bird.draw();
+            bird.draw(ctx);
 
             // Score display
             ctx.fillStyle = 'white';
