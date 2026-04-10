@@ -1,0 +1,842 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game of Life - Neon Wave 3D Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a0a2e 50%, #0a0a1f 100%);
+            font-family: 'Courier New', monospace;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        /* Scanline overlay */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 3px
+            );
+            z-index: 100;
+        }
+        
+        /* Vignette effect */
+        .vignette {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: radial-gradient(ellipse at center, transparent 50%, rgba(0, 0, 0, 0.5) 100%);
+            z-index: 99;
+        }
+        
+        /* Control panel */
+        #controls {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(10, 10, 20, 0.85);
+            border: 1px solid #00ffff;
+            border-radius: 8px;
+            padding: 20px;
+            color: #00ffff;
+            z-index: 90;
+            min-width: 280px;
+            backdrop-filter: blur(5px);
+        }
+        
+        #controls h2 {
+            font-size: 16px;
+            margin-bottom: 15px;
+            color: #ff00ff;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            border-bottom: 1px solid #00ffff;
+            padding-bottom: 8px;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            margin-bottom: 5px;
+            color: #9d4edd;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            height: 8px;
+            -webkit-appearance: none;
+            background: linear-gradient(90deg, #00ffff, #ff00ff);
+            border-radius: 4px;
+            outline: none;
+        }
+        
+        .control-group input[type="range"]::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            width: 16px;
+            height: 16px;
+            background: #ffffff;
+            border-radius: 50%;
+            cursor: pointer;
+            box-shadow: 0 0 10px #00ffff;
+        }
+        
+        .control-group input[type="number"] {
+            width: 80px;
+            padding: 5px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #ff00ff;
+            color: #00ffff;
+            font-family: 'Courier New', monospace;
+            border-radius: 4px;
+        }
+        
+        .value-display {
+            float: right;
+            color: #ffffff;
+        }
+        
+        /* Buttons */
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            margin-top: 15px;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background: linear-gradient(135deg, #00ffff, #9d4edd);
+            border: none;
+            border-radius: 4px;
+            color: #0a0a0f;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            font-size: 11px;
+        }
+        
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+        }
+        
+        /* Stats display */
+        #stats {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 20, 0.85);
+            border: 1px solid #9d4edd;
+            border-radius: 8px;
+            padding: 15px 20px;
+            color: #9d4edd;
+            z-index: 90;
+            font-size: 13px;
+            backdrop-filter: blur(5px);
+        }
+        
+        .stat-item {
+            margin-bottom: 8px;
+        }
+        
+        .stat-label {
+            color: #ff00ff;
+            font-size: 11px;
+        }
+        
+        .stat-value {
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: bold;
+        }
+        
+        /* Help text */
+        #help {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 20, 0.85);
+            border: 1px solid #ff00ff;
+            border-radius: 8px;
+            padding: 12px 24px;
+            color: #ff00ff;
+            z-index: 90;
+            font-size: 12px;
+            text-align: center;
+            backdrop-filter: blur(5px);
+        }
+        
+        #help kbd {
+            background: rgba(0, 255, 255, 0.3);
+            border: 1px solid #00ffff;
+            border-radius: 3px;
+            padding: 2px 6px;
+            margin: 0 2px;
+            color: #00ffff;
+        }
+        
+        /* Preset selector */
+        select {
+            width: 100%;
+            padding: 8px;
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid #9d4edd;
+            color: #9d4edd;
+            font-family: 'Courier New', monospace;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        
+        select:focus {
+            outline: none;
+            box-shadow: 0 0 10px rgba(157, 78, 221, 0.5);
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container"></div>
+    <div class="scanlines"></div>
+    <div class="vignette"></div>
+    
+    <div id="stats">
+        <div class="stat-item">
+            <span class="stat-label">FRAME</span><br>
+            <span class="stat-value" id="frame-count">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">POPULATION</span><br>
+            <span class="stat-value" id="population-count">0</span>
+        </div>
+        <div class="stat-item">
+            <span class="stat-label">STATUS</span><br>
+            <span class="stat-value" id="status-display">RUNNING</span>
+        </div>
+    </div>
+    
+    <div id="controls">
+        <h2>Simulation Controls</h2>
+        
+        <div class="control-group">
+            <label>Grid Width <span class="value-display" id="width-val">80</span></label>
+            <input type="range" id="grid-width" min="40" max="120" value="80">
+        </div>
+        
+        <div class="control-group">
+            <label>Grid Height <span class="value-display" id="height-val">40</span></label>
+            <input type="range" id="grid-height" min="20" max="60" value="40">
+        </div>
+        
+        <div class="control-group">
+            <label>Cell Size <span class="value-display" id="cell-size-val">15</span></label>
+            <input type="range" id="cell-size" min="8" max="25" value="15">
+        </div>
+        
+        <div class="control-group">
+            <label>Speed (FPS) <span class="value-display" id="fps-val">15</span></label>
+            <input type="range" id="simulation-speed" min="1" max="30" value="15">
+        </div>
+        
+        <div class="control-group">
+            <label>Birth Rule (neighbors)</label>
+            <select id="birth-rule">
+                <option value="3">Classic: 3</option>
+                <option value="2,3">HighLife: 2,3</option>
+                <option value="36">Seeds: 3,6</option>
+                <option value="345">Day & Night: 3,4,5</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>Survival Rule (neighbors)</label>
+            <select id="survival-rule">
+                <option value="2,3">Classic: 2,3</option>
+                <option value="23">Life: 2,3</option>
+                <option value="345678">HighLife: 3,4,5,6,7,8</option>
+                <option value="34678">Day & Night: 3,4,6,7,8</option>
+            </select>
+        </div>
+        
+        <div class="control-group">
+            <label>Preset Pattern</label>
+            <select id="preset-pattern">
+                <option value="">-- Select Pattern --</option>
+                <option value="random">Random Fill</option>
+                <option value="glider">Glider</option>
+                <option value="blinker">Blinker</option>
+                <option value="toad">Toad</option>
+                <option value="beacon">Beacon</option>
+                <option value="gosper_glider_gun">Gosper Glider Gun</option>
+            </select>
+        </div>
+        
+        <div class="button-group">
+            <button id="btn-pause">Pause</button>
+            <button id="btn-random">Randomize</button>
+            <button id="btn-clear">Clear</button>
+        </div>
+    </div>
+    
+    <div id="help">
+        <kbd>Space</kbd> Pause/Resume | 
+        <kbd>R</kbd> Randomize | 
+        <kbd>C</kbd> Clear | 
+        <kbd>Scroll</kbd> Zoom | 
+        <kbd>Drag</kbd> Draw cells
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // ========================================================================
+        // CONFIGURATION
+        // ========================================================================
+        let GRID_WIDTH = 80;
+        let GRID_HEIGHT = 40;
+        let CELL_SIZE = 15;
+        let FPS = 15;
+        
+        // Game of Life Rules
+        let BIRTH_RULES = [3];
+        let SURVIVAL_RULES = [2, 3];
+        
+        // Colors - Neon palette
+        const COLORS = {
+            bg: new THREE.Color(0x0a0a0f),
+            cyan: new THREE.Color(0x00ffff),
+            magenta: new THREE.Color(0xff00ff),
+            purple: new THREE.Color(0x9d4edd),
+            grid: new THREE.Color(0x14141e)
+        };
+        
+        // ========================================================================
+        // GLOBAL VARIABLES
+        // ========================================================================
+        let scene, camera, renderer, composer;
+        let grid = [];
+        let instancedMesh;
+        let frameCount = 0;
+        let isPaused = false;
+        let lastTime = 0;
+        let zoomLevel = 1;
+        let isDragging = false;
+        let dragPosition = null;
+        
+        // ========================================================================
+        // INITIALIZATION
+        // ========================================================================
+        function init() {
+            // Scene setup
+            scene = new THREE.Scene();
+            scene.background = COLORS.bg;
+            
+            // Camera setup with perspective
+            camera = new THREE.PerspectiveCamera(
+                60,
+                window.innerWidth / window.innerHeight,
+                0.1,
+                1000
+            );
+            camera.position.z = 500;
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            document.getElementById('canvas-container').appendChild(renderer.domElement);
+            
+            // Post-processing with bloom effect
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(
+                new THREE.Vector2(window.innerWidth, window.innerHeight),
+                1.5, 0.4, 0.85
+            );
+            bloomPass.threshold = 0;
+            bloomPass.strength = 1.2;
+            bloomPass.radius = 0.5;
+            
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+            
+            // Create initial grid
+            createGrid();
+            
+            // Create instanced mesh for cells
+            createCellsMesh();
+            
+            // Setup event listeners
+            setupEventListeners();
+            
+            // Start animation loop
+            requestAnimationFrame(animate);
+        }
+        
+        function createGrid() {
+            grid = [];
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                grid[y] = [];
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    grid[y][x] = 0;
+                }
+            }
+        }
+        
+        function randomizeGrid() {
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    grid[y][x] = Math.random() > 0.7 ? 1 : 0;
+                }
+            }
+            updateMesh();
+        }
+        
+        function clearGrid() {
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    grid[y][x] = 0;
+                }
+            }
+            updateMesh();
+        }
+        
+        function createCellsMesh() {
+            if (instancedMesh) {
+                scene.remove(instancedMesh);
+                instancedMesh.geometry.dispose();
+                instancedMesh.material.dispose();
+            }
+            
+            const geometry = new THREE.BoxGeometry(CELL_SIZE, CELL_SIZE, CELL_SIZE);
+            const material = new THREE.MeshBasicMaterial({ 
+                color: COLORS.cyan,
+                transparent: true,
+                opacity: 0.9
+            });
+            
+            instancedMesh = new THREE.InstancedMesh(geometry, material, GRID_WIDTH * GRID_HEIGHT);
+            instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+            
+            updateMesh();
+            scene.add(instancedMesh);
+        }
+        
+        function updateMesh() {
+            const dummy = new THREE.Object3D();
+            let index = 0;
+            
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    if (grid[y][x] === 1) {
+                        // Position cells in 3D space with slight perspective
+                        dummy.position.set(
+                            (x - GRID_WIDTH / 2) * CELL_SIZE,
+                            -(y - GRID_HEIGHT / 2) * CELL_SIZE,
+                            0
+                        );
+                        
+                        // Color cycling based on position and time
+                        const time = Date.now() * 0.001;
+                        let color;
+                        if ((x + y + Math.floor(time)) % 3 === 0) {
+                            color = COLORS.cyan;
+                        } else if ((x + y + Math.floor(time)) % 3 === 1) {
+                            color = COLORS.magenta;
+                        } else {
+                            color = COLORS.purple;
+                        }
+                        
+                        dummy.material = new THREE.MeshBasicMaterial({ 
+                            color: color,
+                            transparent: true,
+                            opacity: 0.9
+                        });
+                        dummy.updateMatrix();
+                        instancedMesh.setMatrixAt(index++, dummy.matrix);
+                    } else {
+                        dummy.position.set(0, 0, -100); // Hide dead cells
+                        dummy.updateMatrix();
+                        instancedMesh.setMatrixAt(index++, dummy.matrix);
+                    }
+                }
+            }
+            
+            instancedMesh.instanceMatrix.needsUpdate = true;
+        }
+        
+        function countLiveCells() {
+            let count = 0;
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    count += grid[y][x];
+                }
+            }
+            return count;
+        }
+        
+        function countNeighbors(x, y) {
+            let count = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    
+                    const nx = (x + dx + GRID_WIDTH) % GRID_WIDTH;
+                    const ny = (y + dy + GRID_HEIGHT) % GRID_HEIGHT;
+                    count += grid[ny][nx];
+                }
+            }
+            return count;
+        }
+        
+        function computeNextGeneration() {
+            const newGrid = [];
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                newGrid[y] = [];
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    const neighbors = countNeighbors(x, y);
+                    
+                    if (grid[y][x] === 1) {
+                        newGrid[y][x] = SURVIVAL_RULES.includes(neighbors) ? 1 : 0;
+                    } else {
+                        newGrid[y][x] = BIRTH_RULES.includes(neighbors) ? 1 : 0;
+                    }
+                }
+            }
+            grid = newGrid;
+        }
+        
+        // ========================================================================
+        // PRESET PATTERNS
+        // ========================================================================
+        function applyPreset(pattern) {
+            clearGrid();
+            
+            const centerX = Math.floor(GRID_WIDTH / 2);
+            const centerY = Math.floor(GRID_HEIGHT / 2);
+            
+            if (pattern === 'glider') {
+                const positions = [[1, 0], [2, 1], [0, 2], [1, 2], [2, 2]];
+                positions.forEach(([dx, dy]) => {
+                    const x = centerX + dx;
+                    const y = centerY + dy;
+                    if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
+                        grid[y][x] = 1;
+                    }
+                });
+            } else if (pattern === 'blinker') {
+                for (let dx = -1; dx <= 1; dx++) {
+                    const x = centerX + dx;
+                    if (x >= 0 && x < GRID_WIDTH) {
+                        grid[centerY][x] = 1;
+                    }
+                }
+            } else if (pattern === 'toad') {
+                const positions = [[0, 1], [1, 1], [2, 1], [-1, 2], [0, 2], [1, 2]];
+                positions.forEach(([dx, dy]) => {
+                    const x = centerX + dx;
+                    const y = centerY + dy;
+                    if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
+                        grid[y][x] = 1;
+                    }
+                });
+            } else if (pattern === 'beacon') {
+                const positions = [[0, 0], [1, 0], [0, 1], [-1, -1], [-1, -2], [-2, -1]];
+                positions.forEach(([dx, dy]) => {
+                    const x = centerX + dx;
+                    const y = centerY + dy;
+                    if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
+                        grid[y][x] = 1;
+                    }
+                });
+            } else if (pattern === 'gosper_glider_gun') {
+                const gunPattern = [
+                    [24, 0], [22, 1], [24, 1], [12, 2], [13, 2], [20, 2], [21, 2], [34, 2], [35, 2],
+                    [11, 3], [15, 3], [20, 3], [21, 3], [34, 3], [35, 3],
+                    [0, 4], [1, 4], [10, 4], [16, 4], [20, 4], [21, 4],
+                    [0, 5], [1, 5], [10, 5], [14, 5], [16, 5], [17, 5],
+                    [22, 5], [24, 5], [10, 6], [16, 6], [24, 6],
+                    [11, 7], [15, 7], [12, 8]
+                ];
+                const offsetX = 5;
+                const offsetY = 5;
+                gunPattern.forEach(([dx, dy]) => {
+                    const x = offsetX + dx;
+                    const y = offsetY + dy;
+                    if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
+                        grid[y][x] = 1;
+                    }
+                });
+            } else if (pattern === 'random') {
+                randomizeGrid();
+                return;
+            }
+            
+            updateMesh();
+        }
+        
+        // ========================================================================
+        // EVENT LISTENERS
+        // ========================================================================
+        function setupEventListeners() {
+            // Window resize
+            window.addEventListener('resize', onWindowResize);
+            
+            // Mouse events for drawing
+            const canvas = renderer.domElement;
+            canvas.addEventListener('mousedown', onMouseDown);
+            canvas.addEventListener('mousemove', onMouseMove);
+            canvas.addEventListener('mouseup', onMouseUp);
+            canvas.addEventListener('wheel', onMouseWheel);
+            
+            // Keyboard controls
+            document.addEventListener('keydown', onKeyDown);
+            
+            // UI controls
+            document.getElementById('grid-width').addEventListener('input', (e) => {
+                GRID_WIDTH = parseInt(e.target.value);
+                document.getElementById('width-val').textContent = GRID_WIDTH;
+                recreateGrid();
+            });
+            
+            document.getElementById('grid-height').addEventListener('input', (e) => {
+                GRID_HEIGHT = parseInt(e.target.value);
+                document.getElementById('height-val').textContent = GRID_HEIGHT;
+                recreateGrid();
+            });
+            
+            document.getElementById('cell-size').addEventListener('input', (e) => {
+                CELL_SIZE = parseInt(e.target.value);
+                document.getElementById('cell-size-val').textContent = CELL_SIZE;
+                recreateGrid();
+            });
+            
+            document.getElementById('simulation-speed').addEventListener('input', (e) => {
+                FPS = parseInt(e.target.value);
+                document.getElementById('fps-val').textContent = FPS;
+            });
+            
+            document.getElementById('birth-rule').addEventListener('change', (e) => {
+                BIRTH_RULES = e.target.value.split(',').map(Number);
+            });
+            
+            document.getElementById('survival-rule').addEventListener('change', (e) => {
+                SURVIVAL_RULES = e.target.value.split(',').map(Number);
+            });
+            
+            document.getElementById('preset-pattern').addEventListener('change', (e) => {
+                if (e.target.value) {
+                    applyPreset(e.target.value);
+                    e.target.value = '';
+                }
+            });
+            
+            document.getElementById('btn-pause').addEventListener('click', togglePause);
+            document.getElementById('btn-random').addEventListener('click', () => {
+                randomizeGrid();
+                document.getElementById('frame-count').textContent = '0';
+                frameCount = 0;
+            });
+            document.getElementById('btn-clear').addEventListener('click', () => {
+                clearGrid();
+                document.getElementById('frame-count').textContent = '0';
+                frameCount = 0;
+            });
+        }
+        
+        function recreateGrid() {
+            const oldGrid = grid;
+            createGrid();
+            
+            // Copy over existing cells if possible
+            const oldHeight = Math.min(oldGrid.length, GRID_HEIGHT);
+            const oldWidth = oldGrid[0] ? oldGrid[0].length : 0;
+            
+            for (let y = 0; y < oldHeight; y++) {
+                for (let x = 0; x < Math.min(oldWidth, GRID_WIDTH); x++) {
+                    grid[y][x] = oldGrid[y][x];
+                }
+            }
+            
+            createCellsMesh();
+        }
+        
+        function onWindowResize() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+        
+        function onMouseDown(event) {
+            if (event.button === 0) { // Left click
+                isDragging = true;
+                dragPosition = getMouseGridPosition(event);
+            }
+        }
+        
+        function onMouseMove(event) {
+            if (isDragging && dragPosition) {
+                const currentPos = getMouseGridPosition(event);
+                if (currentPos) {
+                    // Draw cells along the drag path
+                    const dx = Math.abs(currentPos.x - dragPosition.x);
+                    const dy = Math.abs(currentPos.y - dragPosition.y);
+                    
+                    if (dx > 1 || dy > 1) {
+                        for (let y = Math.min(dragPosition.y, currentPos.y); 
+                             y <= Math.max(dragPosition.y, currentPos.y); y++) {
+                            for (let x = Math.min(dragPosition.x, currentPos.x); 
+                                 x <= Math.max(dragPosition.x, currentPos.x); x++) {
+                                if (y >= 0 && y < GRID_HEIGHT && x >= 0 && x < GRID_WIDTH) {
+                                    grid[y][x] = 1;
+                                }
+                            }
+                        }
+                        updateMesh();
+                    }
+                    
+                    dragPosition = currentPos;
+                }
+            }
+        }
+        
+        function onMouseUp() {
+            isDragging = false;
+            dragPosition = null;
+        }
+        
+        function onMouseWheel(event) {
+            event.preventDefault();
+            const delta = event.deltaY > 0 ? 0.9 : 1.1;
+            zoomLevel = Math.max(0.5, Math.min(3, zoomLevel * delta));
+            camera.position.z = 500 * zoomLevel;
+        }
+        
+        function getMouseGridPosition(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouseX = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+            const mouseY = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+            
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouseX, mouseY);
+            
+            // Simple projection-based calculation instead of raycasting
+            const screenX = (mouseX * window.innerWidth) / 2;
+            const screenY = -(mouseY * window.innerHeight) / 2;
+            
+            const cellSizeWithZoom = CELL_SIZE * zoomLevel;
+            const x = Math.floor(screenX / cellSizeWithZoom + GRID_WIDTH / 2);
+            const y = Math.floor(-screenY / cellSizeWithZoom + GRID_HEIGHT / 2);
+            
+            if (x >= 0 && x < GRID_WIDTH && y >= 0 && y < GRID_HEIGHT) {
+                return { x, y };
+            }
+            return null;
+        }
+        
+        function onKeyDown(event) {
+            switch(event.code) {
+                case 'Space':
+                    togglePause();
+                    break;
+                case 'KeyR':
+                    randomizeGrid();
+                    document.getElementById('frame-count').textContent = '0';
+                    frameCount = 0;
+                    break;
+                case 'KeyC':
+                    clearGrid();
+                    document.getElementById('frame-count').textContent = '0';
+                    frameCount = 0;
+                    break;
+            }
+        }
+        
+        function togglePause() {
+            isPaused = !isPaused;
+            const btn = document.getElementById('btn-pause');
+            const status = document.getElementById('status-display');
+            
+            if (isPaused) {
+                btn.textContent = 'Resume';
+                status.textContent = 'PAUSED';
+                status.style.color = '#ff00ff';
+            } else {
+                btn.textContent = 'Pause';
+                status.textContent = 'RUNNING';
+                status.style.color = '#00ffff';
+            }
+        }
+        
+        // ========================================================================
+        // ANIMATION LOOP
+        // ========================================================================
+        function animate(currentTime) {
+            requestAnimationFrame(animate);
+            
+            const deltaTime = currentTime - lastTime;
+            const interval = 1000 / FPS;
+            
+            if (!isPaused && deltaTime >= interval) {
+                computeNextGeneration();
+                updateMesh();
+                frameCount++;
+                
+                // Update stats display
+                document.getElementById('frame-count').textContent = frameCount;
+                document.getElementById('population-count').textContent = countLiveCells();
+                
+                lastTime = currentTime;
+            }
+            
+            // Render with post-processing
+            composer.render();
+        }
+        
+        // Start the application
+        init();
+    </script>
+</body>
+</html>
