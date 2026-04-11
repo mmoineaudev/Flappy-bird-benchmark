@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game of Life - Neon Wave 3D Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background: linear-gradient(180deg, #0a0a0f 0%, #1a0a2e 50%, #0a0a0f 100%);
+            font-family: 'Courier New', monospace;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        /* Scanline overlay effect */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0%,
+                rgba(0, 255, 255, 0.03) 50%,
+                transparent 100%
+            );
+            animation: scanline 8s linear infinite;
+            z-index: 100;
+        }
+        
+        @keyframes scanline {
+            0% { background-position: 0 0; }
+            100% { background-position: 0 100vh; }
+        }
+        
+        /* CRT flicker effect */
+        .crt-flicker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            animation: flicker 0.15s infinite;
+            opacity: 0.05;
+            z-index: 99;
+        }
+        
+        @keyframes flicker {
+            0%, 100% { opacity: 0.03; }
+            50% { opacity: 0.07; }
+        }
+        
+        /* UI Panel */
+        #ui-panel {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(10, 10, 20, 0.85);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            padding: 15px;
+            color: #00ffff;
+            z-index: 50;
+            min-width: 280px;
+            box-shadow: 0 0 20px rgba(0, 255, 255, 0.3), inset 0 0 10px rgba(0, 255, 255, 0.1);
+        }
+        
+        #ui-panel h2 {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #ff00ff;
+            text-shadow: 0 0 10px #ff00ff;
+            border-bottom: 1px solid #ff00ff;
+            padding-bottom: 5px;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .stat-value {
+            color: #9d4edd;
+            font-weight: bold;
+        }
+        
+        .control-group {
+            margin: 12px 0;
+            border-top: 1px solid #333;
+            padding-top: 8px;
+        }
+        
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            color: #aaa;
+            margin-bottom: 4px;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            background: linear-gradient(90deg, #0a0a0f, #00ffff);
+            border: 1px solid #00ffff;
+            border-radius: 4px;
+        }
+        
+        .control-group input[type="number"] {
+            width: 60px;
+            background: #0a0a0f;
+            border: 1px solid #ff00ff;
+            color: #ff00ff;
+            padding: 4px;
+            border-radius: 4px;
+        }
+        
+        .button-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 8px 12px;
+            background: linear-gradient(180deg, #0a0a0f, #1a1a3e);
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+            cursor: pointer;
+            border-radius: 4px;
+            transition: all 0.3s;
+        }
+        
+        button:hover {
+            background: linear-gradient(180deg, #0a0a2f, #00ffff);
+            color: #0a0a0f;
+            box-shadow: 0 0 15px #00ffff;
+        }
+        
+        .key-hint {
+            font-size: 11px;
+            color: #888;
+            margin-top: 10px;
+            border-top: 1px dashed #333;
+            padding-top: 8px;
+        }
+        
+        .key-hint kbd {
+            background: #1a1a3e;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #ff00ff;
+            font-family: monospace;
+        }
+        
+        /* Toggle switches */
+        .toggle-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin: 6px 0;
+        }
+        
+        .toggle-switch {
+            position: relative;
+            width: 40px;
+            height: 20px;
+        }
+        
+        .toggle-switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #1a1a3e;
+            border: 1px solid #ff00ff;
+            border-radius: 20px;
+            transition: 0.3s;
+        }
+        
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 14px;
+            width: 14px;
+            left: 3px;
+            bottom: 3px;
+            background-color: #ff00ff;
+            border-radius: 50%;
+            transition: 0.3s;
+        }
+        
+        input:checked + .slider {
+            background-color: #00ffff;
+        }
+        
+        input:checked + .slider:before {
+            transform: translateX(20px);
+            background-color: #0a0a0f;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div class="scanlines"></div>
+        <div class="crt-flicker"></div>
+        
+        <div id="ui-panel">
+            <h2>🎮 Game of Life 3D</h2>
+            
+            <div class="stat-row">
+                <span>Frame:</span>
+                <span id="frame-count" class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+                <span>Population:</span>
+                <span id="population" class="stat-value">0</span>
+            </div>
+            <div class="stat-row">
+                <span>FPS:</span>
+                <span id="fps" class="stat-value">60</span>
+            </div>
+            
+            <div class="control-group">
+                <label>Grid Size: <span id="grid-size-val">80</span></label>
+                <input type="range" id="grid-size" min="40" max="120" value="80">
+            </div>
+            
+            <div class="control-group">
+                <label>Birth Rule: <span id="birth-val">3</span></label>
+                <input type="number" id="birth-rule" min="1" max="8" value="3">
+            </div>
+            
+            <div class="control-group">
+                <label>Survival: <span id="survival-val">2-3</span></label>
+                <div style="display: flex; gap: 5px;">
+                    <input type="number" id="surv-min" min="1" max="8" value="2" style="width: 50px;">
+                    <span>-</span>
+                    <input type="number" id="surv-max" min="1" max="8" value="3" style="width: 50px;">
+                </div>
+            </div>
+            
+            <div class="control-group">
+                <label>Speed (FPS): <span id="speed-val">30</span></label>
+                <input type="range" id="speed" min="5" max="60" value="30">
+            </div>
+            
+            <div class="control-group">
+                <label>Effects:</label>
+                <div class="toggle-row">
+                    <span>Glow Effect</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="glow-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <span>Scanlines</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="scanlines-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+                <div class="toggle-row">
+                    <span>Particles</span>
+                    <label class="toggle-switch">
+                        <input type="checkbox" id="particles-toggle" checked>
+                        <span class="slider"></span>
+                    </label>
+                </div>
+            </div>
+            
+            <div class="button-row">
+                <button id="pause-btn">⏸ Pause</button>
+                <button id="random-btn">🎲 Random</button>
+                <button id="clear-btn">🗑 Clear</button>
+            </div>
+            
+            <div class="key-hint">
+                <kbd>Space</kbd> Pause/Resume<br>
+                <kbd>R</kbd> Randomize<br>
+                <kbd>C</kbd> Clear<br>
+                <kbd>Click+Drag</kbd> Draw cells<br>
+                <kbd>Scroll</kbd> Zoom in/out
+            </div>
+        </div>
+    </div>
+
+    <!-- Three.js via CDN -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // ==================== CONFIGURATION ====================
+        const GRID_WIDTH = 80;
+        const GRID_HEIGHT = 40;
+        const CELL_SIZE = 15;
+        
+        // Colors
+        const COLOR_BG = new THREE.Color(0x0a0a0f);
+        const COLOR_CELL_ALIVE = new THREE.Color(0x00ffff);
+        const COLOR_GRID = new THREE.Color(0x1e1e28);
+        const COLOR_CELL_DEAD = new THREE.Color(0x9d4edd);
+
+        // Rule parameters
+        let birthRule = 3;
+        let survivalMin = 2;
+        let survivalMax = 3;
+
+        // ==================== GAME STATE ====================
+        let grid = [];
+        let nextGrid = [];
+        let frameCount = 0;
+        let population = 0;
+        let paused = false;
+        let fps = 30;
+        
+        // Particle system
+        let particles = [];
+        const MAX_PARTICLES = 200;
+
+        // ==================== THREE.JS SETUP ====================
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = COLOR_BG;
+
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(GRID_WIDTH * CELL_SIZE / 2, GRID_HEIGHT * CELL_SIZE / 2, 300);
+        camera.lookAt(GRID_WIDTH * CELL_SIZE / 2, GRID_HEIGHT * CELL_SIZE / 2, 0);
+
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+
+        // Post-processing for bloom effect
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.5, 0.4, 0.85
+        );
+        bloomPass.strength = 2.0;
+        bloomPass.radius = 0.8;
+        bloomPass.threshold = 0.1;
+
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+
+        // ==================== GRID RENDERING ====================
+        // Use instanced mesh for performance
+        const totalCells = GRID_WIDTH * GRID_HEIGHT;
+        const geometry = new THREE.BoxGeometry(CELL_SIZE - 1, CELL_SIZE - 1, CELL_SIZE - 1);
+        const material = new THREE.MeshStandardMaterial({
+            color: COLOR_CELL_DEAD,
+            emissive: COLOR_CELL_DEAD,
+            emissiveIntensity: 0.3,
+            metalness: 0.8,
+            roughness: 0.2
+        });
+        
+        const instancedMesh = new THREE.InstancedMesh(geometry, material, totalCells);
+        scene.add(instancedMesh);
+
+        const dummy = new THREE.Object3D();
+        const cellColors = [];
+        const cellPositions = [];
+
+        function initGrid() {
+            grid = Array(GRID_HEIGHT).fill().map(() => Array(GRID_WIDTH).fill(0));
+            nextGrid = Array(GRID_HEIGHT).fill().map(() => Array(GRID_WIDTH).fill(0));
+            
+            // Randomize with 30% chance
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    grid[y][x] = Math.random() < 0.3 ? 1 : 0;
+                }
+            }
+            
+            updatePopulation();
+            updateMesh();
+        }
+
+        function updateMesh() {
+            const aliveColor = COLOR_CELL_ALIVE.clone();
+            const deadColor = COLOR_CELL_DEAD.clone();
+            
+            let index = 0;
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    const isAlive = grid[y][x] === 1;
+                    
+                    dummy.position.set(
+                        x * CELL_SIZE,
+                        y * CELL_SIZE,
+                        0
+                    );
+                    
+                    if (isAlive) {
+                        dummy.scale.set(1.2, 1.2, 1.2);
+                        dummy.material = material.clone();
+                        dummy.material.color = aliveColor;
+                        dummy.material.emissive = aliveColor;
+                        dummy.material.emissiveIntensity = 0.8;
+                    } else {
+                        dummy.scale.set(1, 1, 1);
+                        dummy.material = material.clone();
+                        dummy.material.color = deadColor;
+                        dummy.material.emissive = deadColor;
+                        dummy.material.emissiveIntensity = 0.3;
+                    }
+                    
+                    dummy.updateMatrix();
+                    instancedMesh.setMatrix(index, dummy.matrix);
+                    index++;
+                }
+            }
+            
+            instancedMesh.instanceMatrix.needsUpdate = true;
+        }
+
+        // ==================== PARTICLE SYSTEM ====================
+        function createParticle(x, y, isBirth) {
+            if (particles.length >= MAX_PARTICLES) {
+                particles.shift();
+            }
+            
+            const particleColor = isBirth ? 0x00ffff : 0xff00ff;
+            const geometry = new THREE.BoxGeometry(3, 3, 3);
+            const material = new THREE.MeshBasicMaterial({ color: particleColor });
+            const particle = new THREE.Mesh(geometry, material);
+            
+            particle.position.set(
+                x * CELL_SIZE + CELL_SIZE / 2,
+                y * CELL_SIZE + CELL_SIZE / 2,
+                (Math.random() - 0.5) * 50
+            );
+            
+            const velocity = new THREE.Vector3(
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 2,
+                (Math.random() - 0.5) * 4
+            );
+            
+            particles.push({ mesh: particle, velocity, life: 1.0 });
+            scene.add(particle);
+        }
+
+        function updateParticles() {
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.life -= 0.02;
+                
+                if (p.life <= 0) {
+                    scene.remove(p.mesh);
+                    particles.splice(i, 1);
+                    continue;
+                }
+                
+                p.mesh.position.add(p.velocity);
+                p.mesh.rotation.x += 0.1;
+                p.mesh.rotation.y += 0.1;
+                p.mesh.scale.setScalar(p.life);
+                p.mesh.material.opacity = p.life;
+            }
+        }
+
+        // ==================== GAME LOGIC ====================
+        function countNeighbors(x, y) {
+            let count = 0;
+            for (let dx = -1; dx <= 1; dx++) {
+                for (let dy = -1; dy <= 1; dy++) {
+                    if (dx === 0 && dy === 0) continue;
+                    
+                    const nx = (x + dx + GRID_WIDTH) % GRID_WIDTH;
+                    const ny = (y + dy + GRID_HEIGHT) % GRID_HEIGHT;
+                    count += grid[ny][nx];
+                }
+            }
+            return count;
+        }
+
+        function update() {
+            if (paused) return;
+            
+            let births = 0;
+            let deaths = 0;
+            
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    const neighbors = countNeighbors(x, y);
+                    const current = grid[y][x];
+                    
+                    if (current === 1) {
+                        // Alive cell - check survival
+                        if (neighbors >= survivalMin && neighbors <= survivalMax) {
+                            nextGrid[y][x] = 1;
+                        } else {
+                            nextGrid[y][x] = 0;
+                            deaths++;
+                            if (Math.random() < 0.3) createParticle(x, y, false);
+                        }
+                    } else {
+                        // Dead cell - check birth
+                        if (neighbors === birthRule) {
+                            nextGrid[y][x] = 1;
+                            births++;
+                            if (Math.random() < 0.5) createParticle(x, y, true);
+                        } else {
+                            nextGrid[y][x] = 0;
+                        }
+                    }
+                }
+            }
+            
+            // Swap grids
+            [grid, nextGrid] = [nextGrid, grid];
+            frameCount++;
+            updatePopulation();
+        }
+
+        function updatePopulation() {
+            population = grid.flat().reduce((sum, val) => sum + val, 0);
+        }
+
+        function randomize() {
+            initGrid();
+        }
+
+        function clear() {
+            for (let y = 0; y < GRID_HEIGHT; y++) {
+                for (let x = 0; x < GRID_WIDTH; x++) {
+                    grid[y][x] = 0;
+                }
+            }
+            frameCount = 0;
+            population = 0;
+            updateMesh();
+        }
+
+        // ==================== INTERACTION ====================
+        let isDragging = false;
+        let lastMousePos = null;
+
+        function getGridPosition(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouseX = event.clientX - rect.left;
+            const mouseY = event.clientY - rect.top;
+            
+            const raycaster = new THREE.Raycaster();
+            const mouse = new THREE.Vector2(
+                (mouseX / window.innerWidth) * 2 - 1,
+                -(mouseY / window.innerHeight) * 2 + 1
+            );
+            
+            raycaster.setFromCamera(mouse, camera);
+            const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            const target = new THREE.Vector3();
+            raycaster.ray.intersectPlane(plane, target);
+            
+            if (target) {
+                const x = Math.floor(target.x / CELL_SIZE);
+                const y = Math.floor(target.y / CELL_SIZE);
+                return { x, y };
+            }
+            return null;
+        }
+
+        renderer.domElement.addEventListener('mousedown', (event) => {
+            if (event.button === 0) { // Left click
+                isDragging = true;
+                lastMousePos = getGridPosition(event);
+                
+                if (lastMousePos) {
+                    grid[lastMousePos.y][lastMousePos.x] = 
+                        grid[lastMousePos.y][lastMousePos.x] ? 0 : 1;
+                    updateMesh();
+                }
+            } else if (event.button === 1) { // Middle click - rotate camera
+                renderer.domElement.style.cursor = 'grabbing';
+            }
+        });
+
+        renderer.domElement.addEventListener('mousemove', (event) => {
+            if (isDragging && lastMousePos) {
+                const pos = getGridPosition(event);
+                if (pos) {
+                    grid[pos.y][pos.x] = 1;
+                    updateMesh();
+                }
+            }
+        });
+
+        renderer.domElement.addEventListener('mouseup', () => {
+            isDragging = false;
+            lastMousePos = null;
+        });
+
+        renderer.domElement.addEventListener('wheel', (event) => {
+            event.preventDefault();
+            const zoomSpeed = 10;
+            const delta = event.deltaY > 0 ? zoomSpeed : -zoomSpeed;
+            
+            camera.position.z += delta;
+            camera.position.z = Math.max(50, Math.min(500, camera.position.z));
+        });
+
+        renderer.domElement.addEventListener('mousedown', (event) => {
+            if (event.button === 1) { // Middle mouse - rotation
+                renderer.domElement.style.cursor = 'grabbing';
+                let isRotating = true;
+                
+                const rotateStart = new THREE.Vector2(event.clientX, event.clientY);
+                const center = new THREE.Vector3(
+                    GRID_WIDTH * CELL_SIZE / 2,
+                    GRID_HEIGHT * CELL_SIZE / 2,
+                    0
+                );
+                
+                const onMove = (moveEvent) => {
+                    const moveDelta = new THREE.Vector2(
+                        moveEvent.clientX - rotateStart.x,
+                        moveEvent.clientY - rotateStart.y
+                    );
+                    
+                    camera.position.x += moveDelta.x * 0.5;
+                    camera.position.y -= moveDelta.y * 0.5;
+                    camera.lookAt(center);
+                    
+                    rotateStart.copy(moveEvent);
+                };
+                
+                const onUp = () => {
+                    isRotating = false;
+                    renderer.domElement.style.cursor = '';
+                    document.removeEventListener('mousemove', onMove);
+                    document.removeEventListener('mouseup', onUp);
+                };
+                
+                document.addEventListener('mousemove', onMove);
+                document.addEventListener('mouseup', onUp);
+            }
+        });
+
+        // ==================== UI BINDINGS ====================
+        document.getElementById('pause-btn').addEventListener('click', () => {
+            paused = !paused;
+            document.getElementById('pause-btn').textContent = 
+                paused ? '▶ Resume' : '⏸ Pause';
+        });
+
+        document.getElementById('random-btn').addEventListener('click', randomize);
+        document.getElementById('clear-btn').addEventListener('click', clear);
+
+        document.getElementById('grid-size').addEventListener('input', (e) => {
+            GRID_WIDTH = parseInt(e.target.value);
+            document.getElementById('grid-size-val').textContent = GRID_WIDTH;
+        });
+
+        document.getElementById('birth-rule').addEventListener('input', (e) => {
+            birthRule = parseInt(e.target.value);
+            document.getElementById('birth-val').textContent = birthRule;
+        });
+
+        document.getElementById('surv-min').addEventListener('input', (e) => {
+            survivalMin = parseInt(e.target.value);
+            document.getElementById('survival-val').textContent = 
+                `${survivalMin}-${document.getElementById('surv-max').value}`;
+        });
+
+        document.getElementById('surv-max').addEventListener('input', (e) => {
+            survivalMax = parseInt(e.target.value);
+            document.getElementById('survival-val').textContent = 
+                `${document.getElementById('surv-min').value}-${survivalMax}`;
+        });
+
+        document.getElementById('speed').addEventListener('input', (e) => {
+            fps = parseInt(e.target.value);
+            document.getElementById('speed-val').textContent = fps;
+        });
+
+        document.getElementById('glow-toggle').addEventListener('change', (e) => {
+            bloomPass.enabled = e.target.checked;
+        });
+
+        document.getElementById('scanlines-toggle').addEventListener('change', (e) => {
+            const scanlines = document.querySelector('.scanlines');
+            scanlines.style.display = e.target.checked ? 'block' : 'none';
+        });
+
+        document.getElementById('particles-toggle').addEventListener('change', (e) => {
+            // Particles toggle is handled in update()
+            console.log('Particles:', e.target.checked);
+        });
+
+        // Keyboard controls
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ') {
+                e.preventDefault();
+                paused = !paused;
+                document.getElementById('pause-btn').textContent = 
+                    paused ? '▶ Resume' : '⏸ Pause';
+            } else if (e.key.toLowerCase() === 'r') {
+                randomize();
+            } else if (e.key.toLowerCase() === 'c') {
+                clear();
+            }
+        });
+
+        // Window resize
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // ==================== MAIN LOOP ====================
+        let lastTime = performance.now();
+        let frameAccumulator = 0;
+        
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            const currentTime = performance.now();
+            const deltaTime = currentTime - lastTime;
+            lastTime = currentTime;
+            
+            // Update FPS display
+            const currentFPS = Math.round(1000 / deltaTime);
+            document.getElementById('fps').textContent = currentFPS;
+            
+            // Frame timing for controlled update rate
+            frameAccumulator += deltaTime;
+            const frameInterval = 1000 / fps;
+            
+            if (frameAccumulator >= frameInterval) {
+                update();
+                updateParticles();
+                frameAccumulator -= frameInterval;
+            }
+            
+            // Update UI stats
+            document.getElementById('frame-count').textContent = frameCount;
+            document.getElementById('population').textContent = population;
+            
+            // Render with post-processing
+            composer.render();
+        }
+
+        // ==================== INITIALIZATION ====================
+        initGrid();
+        animate();
+    </script>
+</body>
+</html>
