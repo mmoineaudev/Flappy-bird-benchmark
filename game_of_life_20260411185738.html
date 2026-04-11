@@ -1,0 +1,718 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Game of Life - Retro Neon 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: #0a0a0f;
+            color: #c8c8d5;
+            font-family: 'Courier New', monospace;
+            overflow: hidden;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        /* Retro scanline overlay */
+        .scanlines {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: linear-gradient(
+                to bottom,
+                rgba(255,255,255,0),
+                rgba(255,255,255,0) 50%,
+                rgba(0,0,0,0.3) 50%,
+                rgba(0,0,0,0.3)
+            );
+            background-size: 100% 4px;
+            pointer-events: none;
+            z-index: 10;
+        }
+        
+        /* CRT flicker effect */
+        .crt-flicker {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(255,255,255,0.02);
+            animation: flicker 0.1s infinite;
+            pointer-events: none;
+            z-index: 9;
+        }
+        
+        @keyframes flicker {
+            0% { opacity: 0.02; }
+            50% { opacity: 0.03; }
+            100% { opacity: 0.02; }
+        }
+        
+        /* UI Panel */
+        #ui-panel {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 280px;
+            background: rgba(10, 10, 15, 0.95);
+            border: 2px solid #3a3a4a;
+            padding: 15px;
+            z-index: 20;
+            box-shadow: 0 0 20px rgba(0,255,255,0.2);
+            backdrop-filter: blur(5px);
+        }
+        
+        #ui-panel h2 {
+            color: #00ffff;
+            margin-bottom: 10px;
+            text-shadow: 0 0 5px rgba(0,255,255,0.5);
+            font-size: 18px;
+        }
+        
+        .control-group {
+            margin-bottom: 12px;
+        }
+        
+        .control-group label {
+            display: block;
+            font-size: 12px;
+            color: #aaaaaa;
+            margin-bottom: 4px;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            cursor: pointer;
+        }
+        
+        .control-group span {
+            float: right;
+            color: #00ffff;
+            font-weight: bold;
+        }
+        
+        .stat-group {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #3a3a4a;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+        
+        .stat-value {
+            color: #ff00ff;
+            font-weight: bold;
+        }
+        
+        .button-group {
+            margin-top: 15px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+        
+        button {
+            background: rgba(0,255,255,0.1);
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            padding: 8px 12px;
+            cursor: pointer;
+            font-family: inherit;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: rgba(0,255,255,0.3);
+            box-shadow: 0 0 8px rgba(0,255,255,0.5);
+        }
+        
+        button.active {
+            background: rgba(0,255,255,0.5);
+            box-shadow: 0 0 12px rgba(0,255,255,0.7);
+        }
+        
+        .toggle-row {
+            display: flex;
+            align-items: center;
+            margin-bottom: 8px;
+            font-size: 13px;
+        }
+        
+        .toggle-row input[type="checkbox"] {
+            margin-right: 8px;
+            cursor: pointer;
+        }
+        
+        #pause-indicator {
+            position: fixed;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.9);
+            color: #00ffff;
+            padding: 8px 20px;
+            border: 2px solid #00ffff;
+            z-index: 15;
+            display: none;
+            font-weight: bold;
+            text-shadow: 0 0 8px rgba(0,255,255,0.8);
+        }
+        
+        /* Controls hint */
+        #controls-hint {
+            position: fixed;
+            bottom: 20px;
+            left: 20px;
+            background: rgba(10,10,15,0.9);
+            padding: 10px 15px;
+            border: 1px solid #3a3a4a;
+            z-index: 15;
+            font-size: 12px;
+            color: #aaaaaa;
+        }
+    </style>
+</head>
+<body>
+    <div id="canvas-container">
+        <div class="scanlines"></div>
+        <div class="crt-flicker"></div>
+        
+        <div id="pause-indicator">PAUSED</div>
+        
+        <div id="ui-panel">
+            <h2>GAME OF LIFE 3D</h2>
+            
+            <div class="control-group">
+                <label>Grid Size: <span id="grid-size-val">80x40</span></label>
+                <input type="range" id="grid-size" min="20" max="120" value="80">
+            </div>
+            
+            <div class="control-group">
+                <label>Birth Rule (B): <span id="birth-val">3</span></label>
+                <input type="range" id="birth-rule" min="0" max="8" value="3">
+            </div>
+            
+            <div class="control-group">
+                <label>Survive Min (S<sub>min</sub>): <span id="survive-min-val">2</span></label>
+                <input type="range" id="survive-min" min="0" max="8" value="2">
+            </div>
+            
+            <div class="control-group">
+                <label>Survive Max (S<sub>max</sub>): <span id="survive-max-val">3</span></label>
+                <input type="range" id="survive-max" min="0" max="8" value="3">
+            </div>
+            
+            <div class="control-group">
+                <label>Speed: <span id="speed-val">10</span></label>
+                <input type="range" id="simulation-speed" min="1" max="60" value="10">
+            </div>
+            
+            <div class="stat-group">
+                <div class="stat-row">
+                    <span>Frame:</span>
+                    <span class="stat-value" id="frame-count">0</span>
+                </div>
+                <div class="stat-row">
+                    <span>Population:</span>
+                    <span class="stat-value" id="population">0</span>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button id="randomize-btn">Randomize Grid [R]</button>
+                <button id="clear-btn">Clear Grid [C]</button>
+                <button id="pause-btn">Pause/Resume [Space]</button>
+            </div>
+            
+            <div style="margin-top: 15px; padding-top: 15px; border-top: 1px solid #3a3a4a;">
+                <div class="toggle-row">
+                    <input type="checkbox" id="glow-toggle" checked>
+                    <label for="glow-toggle">Enable Glow</label>
+                </div>
+                <div class="toggle-row">
+                    <input type="checkbox" id="particles-toggle" checked>
+                    <label for="particles-toggle">Particles</label>
+                </div>
+                <div class="toggle-row">
+                    <input type="checkbox" id="scanline-toggle" checked>
+                    <label for="scanline-toggle">Scanlines</label>
+                </div>
+            </div>
+        </div>
+        
+        <div id="controls-hint">
+            Mouse: Click/Drag to draw cells<br>
+            Scroll: Zoom camera
+        </div>
+    </div>
+
+    <script type="module">
+        import * as THREE from 'https://cdn.skypack.com/three@0.160.0/+esm';
+        
+        // Game configuration
+        const CONFIG = {
+            width: 80,
+            height: 40,
+            cellSize: 15,
+            birthRule: 3,
+            surviveMin: 2,
+            surviveMax: 3,
+            fps: 10,
+            glowEnabled: true,
+            particlesEnabled: true,
+            scanlinesEnabled: true
+        };
+        
+        // Game state
+        let grid = [];
+        let nextGrid = [];
+        let paused = false;
+        let frameCount = 0;
+        let lastUpdate = Date.now();
+        let population = 0;
+        
+        // Color cycling
+        const COLORS = [
+            {r: 0, g: 255, b: 255},    // Cyan
+            {r: 255, g: 0, b: 255},    // Magenta
+            {r: 157, g: 78, b: 222}    // Purple
+        ];
+        let colorCycle = 0;
+        
+        // Three.js scene setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0f);
+        
+        // Camera with perspective
+        const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.set(CONFIG.width / 2, CONFIG.height / 2, Math.max(CONFIG.width, CONFIG.height) * 0.8);
+        camera.lookAt(CONFIG.width / 2, CONFIG.height / 2, 0);
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        container.appendChild(renderer.domElement);
+        
+        // Grid group
+        const gridGroup = new THREE.Group();
+        scene.add(gridGroup);
+        
+        // Cell geometry
+        const cellGeometry = new THREE.BoxGeometry(1, 1, 1);
+        
+        // Material with emissive property for glow
+        const materials = COLORS.map(color => {
+            return new THREE.MeshStandardMaterial({
+                color: new THREE.Color(color.r / 255, color.g / 255, color.b / 255),
+                emissive: new THREE.Color(color.r / 255, color.g / 255, color.b / 255),
+                emissiveIntensity: CONFIG.glowEnabled ? 0.8 : 0,
+                roughness: 0.3,
+                metalness: 0.7
+            });
+        });
+        
+        // Cells array
+        const cells = [];
+        
+        // Particle system
+        const particles = [];
+        const particleGeometry = new THREE.BufferGeometry();
+        const particleCount = 1000;
+        const particlePositions = new Float32Array(particleCount * 3);
+        particleGeometry.setAttribute('position', new THREE.BufferAttribute(particlePositions, 3));
+        
+        const particleMaterial = new THREE.PointsMaterial({
+            size: 0.5,
+            vertexColors: true
+        });
+        
+        const particleSystem = new THREE.Points(particleGeometry, particleMaterial);
+        scene.add(particleSystem);
+        
+        // Grid lines
+        function createGridLines() {
+            const gridHelper = new THREE.GridHelper(
+                Math.max(CONFIG.width, CONFIG.height) * 1.2,
+                Math.max(CONFIG.width, CONFIG.height),
+                0x3a3a4a,
+                0x252535
+            );
+            gridHelper.position.set(CONFIG.width / 2, CONFIG.height / 2, -0.1);
+            scene.add(gridHelper);
+        }
+        
+        // Initialize grid
+        function initGrid() {
+            // Clear existing cells
+            while (cells.length > 0) {
+                const cell = cells.pop();
+                gridGroup.remove(cell);
+            }
+            
+            // Create new grid
+            grid = [];
+            nextGrid = [];
+            
+            for (let y = 0; y < CONFIG.height; y++) {
+                grid[y] = [];
+                nextGrid[y] = [];
+                
+                for (let x = 0; x < CONFIG.width; x++) {
+                    const state = Math.random() < 0.2 ? 1 : 0;
+                    grid[y][x] = state;
+                    nextGrid[y][x] = 0;
+                    
+                    // Create cell mesh
+                    const material = materials[0];
+                    const cell = new THREE.Mesh(cellGeometry, material);
+                    cell.position.set(x, y, 0);
+                    cell.userData = { x, y };
+                    gridGroup.add(cell);
+                    cells.push(cell);
+                }
+            }
+            
+            updatePopulation();
+        }
+        
+        // Update cell colors
+        function updateCellColors() {
+            const currentColor = COLORS[colorCycle];
+            const materialIndex = colorCycle % materials.length;
+            
+            for (let i = 0; i < cells.length; i++) {
+                if (grid[i] && grid[i][Math.floor(i / CONFIG.height)]) {
+                    if (grid[i][Math.floor(i / CONFIG.height)] === 1) {
+                        cells[i].material = materials[materialIndex];
+                    }
+                }
+            }
+        }
+        
+        // Get neighbors count
+        function getNeighbors(x, y) {
+            let count = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    
+                    const nx = (x + dx + CONFIG.width) % CONFIG.width;
+                    const ny = (y + dy + CONFIG.height) % CONFIG.height;
+                    
+                    if (grid[ny] && grid[ny][nx] === 1) {
+                        count++;
+                    }
+                }
+            }
+            return count;
+        }
+        
+        // Update game state
+        function updateGame() {
+            if (paused) return;
+            
+            // Apply rules
+            for (let y = 0; y < CONFIG.height; y++) {
+                for (let x = 0; x < CONFIG.width; x++) {
+                    const neighbors = getNeighbors(x, y);
+                    const current = grid[y][x];
+                    
+                    if (current === 1) {
+                        if (CONFIG.surviveMin <= neighbors && neighbors <= CONFIG.surviveMax) {
+                            nextGrid[y][x] = 1;
+                        } else {
+                            nextGrid[y][x] = 0;
+                        }
+                    } else {
+                        if (neighbors === CONFIG.birthRule) {
+                            nextGrid[y][x] = 1;
+                        } else {
+                            nextGrid[y][x] = 0;
+                        }
+                    }
+                }
+            }
+            
+            // Copy next grid to current grid
+            for (let y = 0; y < CONFIG.height; y++) {
+                for (let x = 0; x < CONFIG.width; x++) {
+                    grid[y][x] = nextGrid[y][x];
+                }
+            }
+            
+            frameCount++;
+            updatePopulation();
+            updateCellColors();
+        }
+        
+        // Update population count
+        function updatePopulation() {
+            population = 0;
+            for (let y = 0; y < CONFIG.height; y++) {
+                for (let x = 0; x < CONFIG.width; x++) {
+                    if (grid[y][x] === 1) {
+                        population++;
+                    }
+                }
+            }
+            
+            document.getElementById('population').textContent = population;
+            document.getElementById('frame-count').textContent = frameCount;
+        }
+        
+        // Add particle effect
+        function addParticle(x, y, color) {
+            if (!CONFIG.particlesEnabled || particles.length >= particleCount) return;
+            
+            const index = particles.length;
+            particles.push({
+                position: new THREE.Vector3(x, y, 0),
+                velocity: new THREE.Vector3(
+                    (Math.random() - 0.5) * 0.2,
+                    (Math.random() - 0.5) * 0.2,
+                    Math.random() * 0.3
+                ),
+                life: 1.0,
+                color: color
+            });
+            
+            particlePositions[index * 3] = x;
+            particlePositions[index * 3 + 1] = y;
+            particlePositions[index * 3 + 2] = 0;
+        }
+        
+        // Update particles
+        function updateParticles() {
+            if (particles.length === 0) return;
+            
+            const positions = particleGeometry.attributes.position.array;
+            let aliveCount = 0;
+            
+            for (let i = 0; i < particles.length; i++) {
+                const p = particles[i];
+                
+                if (p.life > 0) {
+                    p.position.add(p.velocity);
+                    p.life -= 0.02;
+                    
+                    positions[i * 3] = p.position.x;
+                    positions[i * 3 + 1] = p.position.y;
+                    positions[i * 3 + 2] = p.position.z;
+                    
+                    aliveCount++;
+                }
+            }
+            
+            particleGeometry.attributes.position.neighbors = true;
+        }
+        
+        // Handle mouse interaction
+        const raycaster = new THREE.Raycaster();
+        const mouse = new THREE.Vector2();
+        let isDragging = false;
+        
+        function onMouseDown(event) {
+            isDragging = true;
+            toggleCellAtMouse(event);
+        }
+        
+        function onMouseUp() {
+            isDragging = false;
+        }
+        
+        function onMouseMove(event) {
+            if (isDragging) {
+                toggleCellAtMouse(event);
+            }
+            
+            // Update camera zoom on mouse wheel
+            if (event.deltaY !== 0) {
+                const zoomFactor = event.deltaY > 0 ? 1.1 : 0.9;
+                camera.position.multiplyScalar(zoomFactor);
+            }
+        }
+        
+        function toggleCellAtMouse(event) {
+            // Calculate mouse position in normalized coordinates
+            mouse.x = (event.clientX / window.innerWidth) * 2 - 1;
+            mouse.y = -(event.clientY / window.innerHeight) * 2 + 1;
+            
+            raycaster.setFromCamera(mouse, camera);
+            const intersects = raycaster.intersectObjects(cells);
+            
+            if (intersects.length > 0) {
+                const cell = intersects[0].object;
+                const x = Math.floor(cell.position.x);
+                const y = Math.floor(cell.position.y);
+                
+                if (x >= 0 && x < CONFIG.width && y >= 0 && y < CONFIG.height) {
+                    grid[y][x] = grid[y][x] === 1 ? 0 : 1;
+                    
+                    if (grid[y][x] === 1) {
+                        addParticle(x, y, COLORS[colorCycle]);
+                    }
+                    
+                    updatePopulation();
+                    updateCellColors();
+                }
+            }
+        }
+        
+        // Event listeners
+        window.addEventListener('mousedown', onMouseDown);
+        window.addEventListener('mouseup', onMouseUp);
+        window.addEventListener('mousemove', onMouseMove);
+        
+        // Resize handler
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        // UI controls
+        function setupUI() {
+            // Grid size
+            const gridSizeInput = document.getElementById('grid-size');
+            gridSizeInput.addEventListener('input', (e) => {
+                CONFIG.width = parseInt(e.target.value);
+                CONFIG.height = Math.max(10, Math.floor(CONFIG.width * 0.5));
+                initGrid();
+                document.getElementById('grid-size-val').textContent = `${CONFIG.width}x${CONFIG.height}`;
+            });
+            
+            // Birth rule
+            const birthRuleInput = document.getElementById('birth-rule');
+            birthRuleInput.addEventListener('input', (e) => {
+                CONFIG.birthRule = parseInt(e.target.value);
+                document.getElementById('birth-val').textContent = CONFIG.birthRule;
+            });
+            
+            // Survive min
+            const surviveMinInput = document.getElementById('survive-min');
+            surviveMinInput.addEventListener('input', (e) => {
+                CONFIG.surviveMin = parseInt(e.target.value);
+                document.getElementById('survive-min-val').textContent = CONFIG.surviveMin;
+            });
+            
+            // Survive max
+            const surviveMaxInput = document.getElementById('survive-max');
+            surviveMaxInput.addEventListener('input', (e) => {
+                CONFIG.surviveMax = parseInt(e.target.value);
+                document.getElementById('survive-max-val').textContent = CONFIG.surviveMax;
+            });
+            
+            // Speed
+            const speedInput = document.getElementById('simulation-speed');
+            speedInput.addEventListener('input', (e) => {
+                CONFIG.fps = parseInt(e.target.value);
+                document.getElementById('speed-val').textContent = CONFIG.fps;
+            });
+            
+            // Buttons
+            document.getElementById('randomize-btn').addEventListener('click', () => {
+                for (let y = 0; y < CONFIG.height; y++) {
+                    for (let x = 0; x < CONFIG.width; x++) {
+                        grid[y][x] = Math.random() < 0.2 ? 1 : 0;
+                    }
+                }
+                updatePopulation();
+                updateCellColors();
+            });
+            
+            document.getElementById('clear-btn').addEventListener('click', () => {
+                for (let y = 0; y < CONFIG.height; y++) {
+                    for (let x = 0; x < CONFIG.width; x++) {
+                        grid[y][x] = 0;
+                    }
+                }
+                updatePopulation();
+                updateCellColors();
+            });
+            
+            document.getElementById('pause-btn').addEventListener('click', () => {
+                paused = !paused;
+                document.getElementById('pause-indicator').style.display = paused ? 'block' : 'none';
+            });
+            
+            // Toggles
+            document.getElementById('glow-toggle').addEventListener('change', (e) => {
+                CONFIG.glowEnabled = e.target.checked;
+                materials.forEach(m => m.emissiveIntensity = CONFIG.glowEnabled ? 0.8 : 0);
+            });
+            
+            document.getElementById('particles-toggle').addEventListener('change', (e) => {
+                CONFIG.particlesEnabled = e.target.checked;
+            });
+            
+            document.getElementById('scanline-toggle').addEventListener('change', (e) => {
+                CONFIG.scanlinesEnabled = e.target.checked;
+                document.querySelector('.scanlines').style.display = CONFIG.scanlinesEnabled ? 'block' : 'none';
+            });
+        }
+        
+        // Keyboard controls
+        window.addEventListener('keydown', (e) => {
+            if (e.key === ' ') {
+                paused = !paused;
+                document.getElementById('pause-indicator').style.display = paused ? 'block' : 'none';
+            } else if (e.key === 'r' || e.key === 'R') {
+                document.getElementById('randomize-btn').click();
+            } else if (e.key === 'c' || e.key === 'C') {
+                document.getElementById('clear-btn').click();
+            }
+        });
+        
+        // Initialize
+        createGridLines();
+        initGrid();
+        setupUI();
+        
+        // Main loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            // Update game logic based on FPS
+            const now = Date.now();
+            const interval = 1000 / CONFIG.fps;
+            
+            if (now - lastUpdate >= interval) {
+                updateGame();
+                lastUpdate = now;
+            }
+            
+            // Update particles
+            updateParticles();
+            
+            // Cycle colors periodically
+            if (frameCount % 30 === 0) {
+                colorCycle = (colorCycle + 1) % COLORS.length;
+                updateCellColors();
+            }
+            
+            renderer.render(scene);
+        }
+        
+        animate();
+    </script>
+</body>
+</html>
