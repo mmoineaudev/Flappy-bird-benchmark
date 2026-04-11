@@ -1,0 +1,707 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game of Life - Neon Retro 3D Edition</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            overflow: hidden;
+            background: linear-gradient(180deg, #0a0a0f 0%, #1a0a2e 50%, #0a0a0f 100%);
+            font-family: 'Courier New', monospace;
+        }
+        
+        #container {
+            width: 100vw;
+            height: 100vh;
+            position: relative;
+        }
+        
+        /* Scanline overlay */
+        .scanlines {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: repeating-linear-gradient(
+                0deg,
+                transparent 0px,
+                transparent 2px,
+                rgba(255, 255, 255, 0.03) 2px,
+                rgba(255, 255, 255, 0.03) 4px
+            );
+            pointer-events: none;
+            z-index: 100;
+        }
+        
+        /* CRT vignette effect */
+        .vignette {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: radial-gradient(ellipse, transparent 50%, rgba(0, 0, 0, 0.6) 100%);
+            pointer-events: none;
+            z-index: 101;
+        }
+        
+        /* UI Panel */
+        #ui-panel {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            background: rgba(10, 10, 15, 0.9);
+            border: 2px solid #00ffff;
+            border-radius: 8px;
+            padding: 15px;
+            color: #c8c8d8;
+            z-index: 50;
+            min-width: 220px;
+            backdrop-filter: blur(10px);
+        }
+        
+        #ui-panel h2 {
+            color: #00ffff;
+            font-size: 18px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        .stat-row {
+            margin: 8px 0;
+            font-size: 14px;
+        }
+        
+        .stat-label {
+            color: #9d4edd;
+            margin-right: 8px;
+        }
+        
+        .stat-value {
+            color: #ff00ff;
+            font-weight: bold;
+        }
+        
+        /* Controls */
+        .controls {
+            margin-top: 15px;
+            padding-top: 15px;
+            border-top: 1px solid #303040;
+        }
+        
+        .control-group {
+            margin: 10px 0;
+        }
+        
+        .control-group label {
+            display: block;
+            color: #9d4edd;
+            font-size: 12px;
+            margin-bottom: 5px;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+            accent-color: #00ffff;
+        }
+        
+        .btn-row {
+            display: flex;
+            gap: 8px;
+            margin-top: 10px;
+        }
+        
+        button {
+            flex: 1;
+            padding: 8px 12px;
+            background: rgba(0, 255, 255, 0.2);
+            border: 1px solid #00ffff;
+            color: #00ffff;
+            font-family: 'Courier New', monospace;
+            cursor: pointer;
+            transition: all 0.3s;
+            border-radius: 4px;
+        }
+        
+        button:hover {
+            background: rgba(0, 255, 255, 0.4);
+            box-shadow: 0 0 15px #00ffff;
+        }
+        
+        /* Keyboard hints */
+        .key-hints {
+            margin-top: 10px;
+            font-size: 11px;
+            color: #888;
+        }
+        
+        .key-hints kbd {
+            background: rgba(255, 0, 255, 0.2);
+            border: 1px solid #ff00ff;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #ff00ff;
+        }
+        
+        /* Pause overlay */
+        #pause-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 48px;
+            color: #ff00ff;
+            text-shadow: 0 0 30px #ff00ff, 0 0 60px #9d4edd;
+            z-index: 200;
+            display: none;
+            font-weight: bold;
+        }
+        
+        /* Glowing effect for title */
+        @keyframes glow {
+            0%, 100% { text-shadow: 0 0 10px #00ffff, 0 0 20px #00ffff; }
+            50% { text-shadow: 0 0 20px #00ffff, 0 0 40px #00ffff; }
+        }
+        
+        h2 {
+            animation: glow 2s infinite;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <canvas id="canvas"></canvas>
+        <div class="scanlines"></div>
+        <div class="vignette"></div>
+        
+        <!-- UI Panel -->
+        <div id="ui-panel">
+            <h2>🎮 Game of Life 3D</h2>
+            
+            <div class="stat-row">
+                <span class="stat-label">Frame:</span>
+                <span class="stat-value" id="frame-count">0</span>
+            </div>
+            
+            <div class="stat-row">
+                <span class="stat-label">Population:</span>
+                <span class="stat-value" id="population-count">0</span>
+            </div>
+            
+            <div class="stat-row">
+                <span class="stat-label">Rules:</span>
+                <span class="stat-value" id="rules-display">B3/S2-3</span>
+            </div>
+            
+            <div class="stat-row">
+                <span class="stat-label">FPS:</span>
+                <span class="stat-value" id="fps-display">60</span>
+            </div>
+            
+            <div class="controls">
+                <div class="control-group">
+                    <label>Grid Size: <span id="grid-size-val">80x40</span></label>
+                    <input type="range" id="grid-width" min="20" max="120" value="80">
+                    <input type="range" id="grid-height" min="20" max="60" value="40">
+                </div>
+                
+                <div class="control-group">
+                    <label>Birth Rule: <span id="birth-val">3</span></label>
+                    <input type="range" id="birth-rule" min="1" max="7" value="3">
+                </div>
+                
+                <div class="btn-row">
+                    <button id="btn-random">Random</button>
+                    <button id="btn-clear">Clear</button>
+                    <button id="btn-pause">Pause</button>
+                </div>
+            </div>
+            
+            <div class="key-hints">
+                <kbd>Space</kbd> Pause/Resume<br>
+                <kbd>R</kbd> Randomize<br>
+                <kbd>C</kbd> Clear<br>
+                <kbd>Click+Drag</kbd> Draw<br>
+                <kbd>Scroll</kbd> Zoom
+            </div>
+        </div>
+        
+        <!-- Pause overlay -->
+        <div id="pause-overlay">PAUSED</div>
+    </div>
+
+    <!-- Three.js from CDN -->
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+
+        // ============================================================================
+        // Configuration
+        // ============================================================================
+        const CONFIG = {
+            GRID_WIDTH: 80,
+            GRID_HEIGHT: 40,
+            CELL_SIZE: 12,
+            BIRTH_RULE: 3,
+            SURVIVAL_MIN: 2,
+            SURVIVAL_MAX: 3,
+            INITIAL_LIVE_PERCENT: 30
+        };
+
+        const COLORS = {
+            background: new THREE.Color(0x0a0a0f),
+            cyan: new THREE.Color(0x00ffff),
+            magenta: new THREE.Color(0xff00ff),
+            purple: new THREE.Color(0x9d4edd)
+        };
+
+        // ============================================================================
+        // Game of Life Engine
+        // ============================================================================
+        class GameOfLife {
+            constructor(width, height) {
+                this.width = width;
+                this.height = height;
+                this.grid = this.createGrid();
+                this.nextGrid = this.createGrid();
+                this.frame = 0;
+            }
+
+            createGrid() {
+                return Array.from({ length: this.height }, () => 
+                    Array(this.width).fill(false)
+                );
+            }
+
+            randomize() {
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        this.grid[y][x] = Math.random() * 100 < CONFIG.INITIAL_LIVE_PERCENT;
+                    }
+                }
+            }
+
+            clear() {
+                this.grid = this.createGrid();
+            }
+
+            countNeighbors(x, y) {
+                let count = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = (x + dx + this.width) % this.width;
+                        const ny = (y + dy + this.height) % this.height;
+                        if (this.grid[ny][nx]) count++;
+                    }
+                }
+                return count;
+            }
+
+            step() {
+                for (let y = 0; y < this.height; y++) {
+                    for (let x = 0; x < this.width; x++) {
+                        const neighbors = this.countNeighbors(x, y);
+                        const alive = this.grid[y][x];
+                        
+                        if (alive && CONFIG.SURVIVAL_MIN <= neighbors && neighbors <= CONFIG.SURVIVAL_MAX) {
+                            this.nextGrid[y][x] = true;
+                        } else if (!alive && neighbors === CONFIG.BIRTH_RULE) {
+                            this.nextGrid[y][x] = true;
+                        } else {
+                            this.nextGrid[y][x] = false;
+                        }
+                    }
+                }
+                
+                // Swap grids
+                [this.grid, this.nextGrid] = [this.nextGrid, this.grid];
+                this.frame++;
+            }
+
+            getPopulation() {
+                return this.grid.flat().filter(Boolean).length;
+            }
+
+            toggleCell(x, y) {
+                if (x >= 0 && x < this.width && y >= 0 && y < this.height) {
+                    this.grid[y][x] = !this.grid[y][x];
+                }
+            }
+
+            setRule(key, value) {
+                CONFIG[key] = value;
+            }
+        }
+
+        // ============================================================================
+        // 3D Scene Setup
+        // ============================================================================
+        class GameOfLife3D {
+            constructor() {
+                this.game = new GameOfLife(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT);
+                this.paused = false;
+                this.lastTime = performance.now();
+                this.frameCount = 0;
+                this.fps = 60;
+                
+                this.initScene();
+                this.initLights();
+                this.createGridMeshes();
+                this.initPostProcessing();
+                this.initEvents();
+                this.updateUI();
+                
+                // Start animation loop
+                this.animate();
+            }
+
+            initScene() {
+                this.container = document.getElementById('container');
+                this.canvas = document.getElementById('canvas');
+                
+                this.scene = new THREE.Scene();
+                this.scene.background = COLORS.background.clone();
+                
+                // Camera with perspective angle
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera = new THREE.PerspectiveCamera(
+                    75, 
+                    aspect, 
+                    0.1, 
+                    1000
+                );
+                this.camera.position.set(0, 0, 80);
+                this.camera.lookAt(0, 0, 0);
+                
+                // Renderer
+                this.renderer = new THREE.WebGLRenderer({ 
+                    canvas: this.canvas,
+                    antialias: true
+                });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                const dpr = typeof window.devicePixelRatio !== 'undefined' ? window.devicePixelRatio : 1;
+                this.renderer.setPixelRatio(Math.min(dpr, 2));
+                
+                // Handle resize
+                window.addEventListener('resize', () => this.onResize());
+            }
+
+            initLights() {
+                this.scene.add(new THREE.AmbientLight(0x222222));
+                
+                // Point lights for each color for dynamic lighting
+                const cyanLight = new THREE.PointLight(0x00ffff, 1, 100);
+                cyanLight.position.set(-50, -50, 50);
+                this.scene.add(cyanLight);
+                
+                const magentaLight = new THREE.PointLight(0xff00ff, 1, 100);
+                magentaLight.position.set(50, 50, 50);
+                this.scene.add(magentaLight);
+            }
+
+            createGridMeshes() {
+                this.cellGroup = new THREE.Group();
+                this.scene.add(this.cellGroup);
+                
+                // Create instanced mesh for efficient rendering
+                const geometry = new THREE.BoxGeometry(CONFIG.CELL_SIZE * 0.9, 
+                                                      CONFIG.CELL_SIZE * 0.9, 
+                                                      CONFIG.CELL_SIZE * 0.3);
+                
+                // Emissive material for neon glow
+                this.material = new THREE.MeshStandardMaterial({
+                    color: 0x00ffff,
+                    emissive: 0x00ffff,
+                    emissiveIntensity: 0.8,
+                    roughness: 0.3,
+                    metalness: 0.7
+                });
+                
+                // Create instance for each cell
+                this.instanceCount = CONFIG.GRID_WIDTH * CONFIG.GRID_HEIGHT;
+                this.instancedMesh = new THREE.InstancedMesh(geometry, this.material);
+                
+                const dummy = new THREE.Object3();
+                let index = 0;
+                for (let y = 0; y < CONFIG.GRID_HEIGHT; y++) {
+                    for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
+                        dummy.position.set(
+                            (x - CONFIG.GRID_WIDTH / 2) * CONFIG.CELL_SIZE,
+                            -(y - CONFIG.GRID_HEIGHT / 2) * CONFIG.CELL_SIZE,
+                            0
+                        );
+                        dummy.updateMatrix();
+                        this.instancedMesh.instanceMatrix.setPosition(index, 
+                            dummy.position.x, dummy.position.y, dummy.position.z);
+                        index++;
+                    }
+                }
+                
+                this.cellGroup.add(this.instancedMesh);
+            }
+
+            initPostProcessing() {
+                this.composer = new EffectComposer(this.renderer);
+                this.renderPass = new RenderPass(this.scene, this.camera);
+                this.composer.addPass(this.renderPass);
+                
+                // Bloom effect for neon glow
+                this.bloomPass = new UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth, window.innerHeight),
+                    1.5,  // strength
+                    0.4,  // radius
+                    0.25  // threshold
+                );
+                this.bloomPass.strength = 2.0;
+                this.bloomPass.radius = 0.8;
+                this.composer.addPass(this.bloomPass);
+            }
+
+            initEvents() {
+                // Mouse interaction for drawing
+                let isDragging = false;
+                let lastMouse = { x: 0, y: 0 };
+                
+                const getGridPos = (event) => {
+                    const rect = this.canvas.getBoundingClientRect();
+                    const x = event.clientX - rect.left;
+                    const y = event.clientY - rect.top;
+                    
+                    // Convert to grid coordinates with perspective
+                    const gridX = Math.floor((x / window.innerWidth - 0.5) * 2 * CONFIG.GRID_WIDTH);
+                    const gridY = Math.floor((1 - y / window.innerHeight - 0.5) * 2 * CONFIG.GRID_HEIGHT);
+                    
+                    return { x: gridX, y: gridY };
+                };
+                
+                this.canvas.addEventListener('mousedown', (e) => {
+                    isDragging = true;
+                    const pos = getGridPos(e);
+                    this.game.toggleCell(pos.x, pos.y);
+                    lastMouse = { x: pos.x, y: pos.y };
+                    this.updateMeshes();
+                });
+                
+                this.canvas.addEventListener('mousemove', (e) => {
+                    if (!isDragging) return;
+                    const pos = getGridPos(e);
+                    
+                    // Draw line between last and current position
+                    const dx = Math.sign(pos.x - lastMouse.x);
+                    const dy = Math.sign(pos.y - lastMouse.y);
+                    
+                    let x = lastMouse.x;
+                    let y = lastMouse.y;
+                    
+                    while (x !== pos.x || y !== pos.y) {
+                        this.game.toggleCell(x, y);
+                        x += dx;
+                        y += dy;
+                    }
+                    
+                    lastMouse = { x: pos.x, y: pos.y };
+                    this.updateMeshes();
+                });
+                
+                this.canvas.addEventListener('mouseup', () => isDragging = false);
+                this.canvas.addEventListener('mouseleave', () => isDragging = false);
+                
+                // Zoom with scroll wheel
+                this.canvas.addEventListener('wheel', (e) => {
+                    e.preventDefault();
+                    const zoomSpeed = 0.1;
+                    const delta = e.deltaY < 0 ? 1 : -1;
+                    const newZ = Math.max(20, Math.min(150, this.camera.position.z + delta * 10));
+                    this.camera.position.z = newZ;
+                }, { passive: false });
+                
+                // Keyboard controls
+                document.addEventListener('keydown', (e) => {
+                    switch(e.code) {
+                        case 'Space':
+                            this.paused = !this.paused;
+                            this.updatePauseUI();
+                            break;
+                        case 'KeyR':
+                            this.game.randomize();
+                            this.updateMeshes();
+                            this.updateUI();
+                            break;
+                        case 'KeyC':
+                            this.game.clear();
+                            this.updateMeshes();
+                            this.updateUI();
+                            break;
+                    }
+                });
+                
+                // UI controls
+                document.getElementById('btn-random').addEventListener('click', () => {
+                    this.game.randomize();
+                    this.updateMeshes();
+                    this.updateUI();
+                });
+                
+                document.getElementById('btn-clear').addEventListener('click', () => {
+                    this.game.clear();
+                    this.updateMeshes();
+                    this.updateUI();
+                });
+                
+                document.getElementById('btn-pause').addEventListener('click', () => {
+                    this.paused = !this.paused;
+                    this.updatePauseUI();
+                });
+                
+                // Grid size controls
+                document.getElementById('grid-width').addEventListener('input', (e) => {
+                    CONFIG.GRID_WIDTH = parseInt(e.target.value);
+                    document.getElementById('grid-size-val').textContent = 
+                        `${CONFIG.GRID_WIDTH}x${CONFIG.GRID_HEIGHT}`;
+                    this.reinitializeGrid();
+                });
+                
+                document.getElementById('grid-height').addEventListener('input', (e) => {
+                    CONFIG.GRID_HEIGHT = parseInt(e.target.value);
+                    document.getElementById('grid-size-val').textContent = 
+                        `${CONFIG.GRID_WIDTH}x${CONFIG.GRID_HEIGHT}`;
+                    this.reinitializeGrid();
+                });
+                
+                // Rule controls
+                document.getElementById('birth-rule').addEventListener('input', (e) => {
+                    CONFIG.BIRTH_RULE = parseInt(e.target.value);
+                    document.getElementById('birth-val').textContent = e.target.value;
+                    this.game.setRule('BIRTH_RULE', CONFIG.BIRTH_RULE);
+                });
+            }
+
+            reinitializeGrid() {
+                this.scene.remove(this.cellGroup);
+                this.createGridMeshes();
+                this.game = new GameOfLife(CONFIG.GRID_WIDTH, CONFIG.GRID_HEIGHT);
+                this.game.randomize();
+                this.updateMeshes();
+            }
+
+            updateMeshes() {
+                const dummy = new THREE.Object3();
+                let index = 0;
+                
+                for (let y = 0; y < CONFIG.GRID_HEIGHT; y++) {
+                    for (let x = 0; x < CONFIG.GRID_WIDTH; x++) {
+                        const alive = this.game.grid[y][x];
+                        
+                        dummy.position.set(
+                            (x - CONFIG.GRID_WIDTH / 2) * CONFIG.CELL_SIZE,
+                            -(y - CONFIG.GRID_HEIGHT / 2) * CONFIG.CELL_SIZE,
+                            0
+                        );
+                        
+                        if (alive) {
+                            // Cycle colors based on position and frame
+                            const hueIndex = (x + y + this.game.frame % 30 / 10) % 3;
+                            const color = [COLORS.cyan, COLORS.magenta, COLORS.purple][hueIndex];
+                            dummy.scale.set(1, 1, 1);
+                            this.instancedMesh.material.emissive.copy(color);
+                            this.instancedMesh.material.emissiveIntensity = 0.8 + Math.sin(this.game.frame * 0.1) * 0.2;
+                        } else {
+                            dummy.scale.set(0, 0, 0);
+                        }
+                        
+                        dummy.updateMatrix();
+                        this.instancedMesh.instanceMatrix.setPosition(index, 
+                            dummy.position.x, dummy.position.y, dummy.position.z);
+                        index++;
+                    }
+                }
+                
+                this.instancedMesh.instanceMatrix.needsUpdate = true;
+            }
+
+            updateUI() {
+                document.getElementById('frame-count').textContent = this.game.frame;
+                document.getElementById('population-count').textContent = this.game.getPopulation();
+                document.getElementById('fps-display').textContent = Math.round(this.fps);
+                this.updatePauseUI();
+            }
+
+            updatePauseUI() {
+                const overlay = document.getElementById('pause-overlay');
+                const btn = document.getElementById('btn-pause');
+                
+                if (this.paused) {
+                    overlay.style.display = 'block';
+                    btn.textContent = 'Resume';
+                } else {
+                    overlay.style.display = 'none';
+                    btn.textContent = 'Pause';
+                }
+            }
+
+            onResize() {
+                const aspect = window.innerWidth / window.innerHeight;
+                this.camera.aspect = aspect;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.composer.setSize(window.innerWidth, window.innerHeight);
+            }
+
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                const now = performance.now();
+                const delta = (now - this.lastTime) / 1000;
+                this.frameCount++;
+                
+                if (delta >= 1) {
+                    this.fps = this.frameCount / delta;
+                    this.frameCount = 0;
+                    this.lastTime = now;
+                    
+                    // Update UI every second
+                    if (!this.paused) {
+                        this.updateUI();
+                    }
+                }
+                
+                // Update bloom intensity with time for pulsing effect
+                const pulse = 1.5 + Math.sin(now * 0.002) * 0.3;
+                this.bloomPass.strength = pulse;
+                
+                if (!this.paused) {
+                    this.game.step();
+                    this.updateMeshes();
+                }
+                
+                this.composer.render();
+            }
+        }
+
+         // Start the game when page loads
+        document.addEventListener('DOMContentLoaded', () => {
+            new GameOfLife3D();
+        });
+    </script>
+</body>
+</html>
