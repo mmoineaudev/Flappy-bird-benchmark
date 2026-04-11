@@ -1,0 +1,368 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Volumetric Cellular Automata</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { overflow: hidden; background: #000; font-family: 'Courier New', monospace; }
+        canvas { display: block; }
+        #fps-counter { position: absolute; top: 10px; left: 10px; color: #0ff; font-size: 14px; z-index: 100; text-shadow: 0 0 5px #0ff; }
+    </style>
+</head>
+<body>
+    <div id="fps-counter">FPS: 60</div>
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
+            "lil-gui": "https://unpkg.com/lil-gui@0.19.1/dist/lil-gui.esm.min.js"
+        }
+    }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import GUI from 'lil-gui';
+
+        // ============================================
+        // SIMULATION ENGINE (Use Case 1)
+        // ============================================
+        class AutomataEngine {
+            constructor(size = 32, rules = { birth: [3], survival: [2, 3] }) {
+                this.size = size;
+                this.rules = rules;
+                this.bufferA = new Uint8Array(size * size * size);
+                this.bufferB = new Uint8Array(size * size * size);
+                this.currentBuffer = this.bufferA;
+                this.nextBuffer = this.bufferB;
+            }
+
+            getIndex(x, y, z) {
+                return x + this.size * (y + this.size * z);
+            }
+
+            countNeighbors(x, y, z) {
+                let count = 0;
+                for (let dx = -1; dx <= 1; dx++) {
+                    for (let dy = -1; dy <= 1; dy++) {
+                        for (let dz = -1; dz <= 1; dz++) {
+                            if (dx === 0 && dy === 0 && dz === 0) continue;
+                            let nx = (x + dx + this.size) % this.size;
+                            let ny = (y + dy + this.size) % this.size;
+                            let nz = (z + dz + this.size) % this.size;
+                            count += this.currentBuffer[this.getIndex(nx, ny, nz)];
+                        }
+                    }
+                }
+                return count;
+            }
+
+            update() {
+                for (let x = 0; x < this.size; x++) {
+                    for (let y = 0; y < this.size; y++) {
+                        for (let z = 0; z < this.size; z++) {
+                            const idx = this.getIndex(x, y, z);
+                            const state = this.currentBuffer[idx];
+                            const neighbors = this.countNeighbors(x, y, z);
+                            
+                            if (state === 0) {
+                                this.nextBuffer[idx] = this.rules.birth.includes(neighbors) ? 1 : 0;
+                            } else {
+                                this.nextBuffer[idx] = this.rules.survival.includes(neighbors) ? 1 : 0;
+                            }
+                        }
+                    }
+                }
+                [this.currentBuffer, this.nextBuffer] = [this.nextBuffer, this.currentBuffer];
+            }
+
+            randomize() {
+                for (let i = 0; i < this.bufferA.length; i++) {
+                    this.bufferA[i] = Math.random() > 0.7 ? 1 : 0;
+                }
+                this.bufferB.fill(0);
+            }
+
+            clear() {
+                this.bufferA.fill(0);
+                this.bufferB.fill(0);
+            }
+
+            setCell(x, y, z) {
+                const idx = this.getIndex(x % this.size, y % this.size, z % this.size);
+                this.currentBuffer[idx] = 1;
+            }
+
+            getLivingCells() {
+                const cells = [];
+                for (let x = 0; x < this.size; x++) {
+                    for (let y = 0; y < this.size; y++) {
+                        for (let z = 0; z < this.size; z++) {
+                            if (this.currentBuffer[this.getIndex(x, y, z)] === 1) {
+                                cells.push({ x, y, z });
+                            }
+                        }
+                    }
+                }
+                return cells;
+            }
+
+            setRules(birth, survival) {
+                this.rules = { birth: birth || [3], survival: survival || [2, 3] };
+            }
+        }
+
+        // ============================================
+        // VISUALIZER (Use Case 2)
+        // ============================================
+        class Visualizer {
+            constructor(engine, canvasSize = 800) {
+                this.engine = engine;
+                this.canvasSize = canvasSize;
+                this.scene = new THREE.Scene();
+                this.scene.background = new THREE.Color(0x050510);
+                
+                this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.camera.position.set(40, 30, 40);
+
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.toneMapping = THREE.ReinhardToneMapping;
+                document.body.appendChild(this.renderer.domElement);
+
+                this.setupPostProcessing();
+                this.createInstancedMesh();
+                this.createWireframeGrid();
+                this.setupLighting();
+            }
+
+            setupPostProcessing() {
+                this.composer = new EffectComposer(this.renderer);
+                const renderPass = new RenderPass(this.scene, this.camera);
+                this.composer.addPass(renderPass);
+                
+                const bloomPass = new UnrealBloomPass(
+                    new THREE.Vector2(window.innerWidth, window.innerHeight),
+                    1.5, 0.4, 0.85
+                );
+                bloomPass.threshold = 0;
+                bloomPass.strength = 1.2;
+                bloomPass.radius = 0.5;
+                this.composer.addPass(bloomPass);
+            }
+
+            createInstancedMesh() {
+                const geometry = new THREE.BoxGeometry(0.9, 0.9, 0.9);
+                const material = new THREE.MeshStandardMaterial({
+                    color: 0x00ffff,
+                    emissive: 0x00ffff,
+                    emissiveIntensity: 2,
+                    metalness: 0.8,
+                    roughness: 0.2
+                });
+
+                this.instancedMesh = new THREE.InstancedMesh(geometry, material, engine.size * engine.size * engine.size);
+                this.instanceCount = 0;
+                this.matrix = new THREE.Matrix4();
+            }
+
+            createWireframeGrid() {
+                const gridSize = this.engine.size + 1;
+                const gridHelper = new THREE.GridHelper(gridSize, gridSize, 0x2244aa, 0x112255);
+                gridHelper.rotation.x = Math.PI / 2;
+                this.scene.add(gridHelper);
+
+                const edges = new THREE.EdgesGeometry(new THREE.BoxGeometry(gridSize, gridSize, gridSize));
+                const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x113377, transparent: true, opacity: 0.3 }));
+                this.scene.add(line);
+            }
+
+            setupLighting() {
+                const ambient = new THREE.AmbientLight(0x404040, 2);
+                this.scene.add(ambient);
+
+                const point1 = new THREE.PointLight(0x00ffff, 500, 100);
+                point1.position.set(20, 20, 20);
+                this.scene.add(point1);
+
+                const point2 = new THREE.PointLight(0xff00ff, 500, 100);
+                point2.position.set(-20, -20, 20);
+                this.scene.add(point2);
+            }
+
+            update() {
+                this.instanceCount = 0;
+                const offset = (this.engine.size - 1) / 2;
+                
+                for (let x = 0; x < this.engine.size; x++) {
+                    for (let y = 0; y < this.engine.size; y++) {
+                        for (let z = 0; z < this.engine.size; z++) {
+                            if (this.engine.currentBuffer[this.engine.getIndex(x, y, z)] === 1) {
+                                this.matrix.setPosition(new THREE.Vector3(
+                                    x - offset, y - offset, z - offset
+                                ));
+                                this.instancedMesh.setMatrixAt(this.instanceCount++, this.matrix);
+                            }
+                        }
+                    }
+                }
+                this.instancedMesh.instanceMatrix.needsUpdate = true;
+            }
+
+            render() {
+                this.composer.render();
+            }
+
+            resize(width, height) {
+                this.camera.aspect = width / height;
+                this.camera.updateProjectionMatrix();
+                this.renderer.setSize(width, height);
+                this.composer.setSize(width, height);
+            }
+        }
+
+        // ============================================
+        // UI MANAGER (Use Case 3)
+        // ============================================
+        class UIManager {
+            constructor(engine, visualizer) {
+                this.engine = engine;
+                this.visualizer = visualizer;
+                this.controls = new OrbitControls(visualizer.camera, visualizer.renderer.domElement);
+                this.controls.enableDamping = true;
+                
+                this.params = {
+                    playing: true,
+                    speed: 100,
+                    gridSize: engine.size,
+                    birthRules: '3',
+                    survivalRules: '2,3',
+                    color: '#00ffff',
+                    bloomStrength: 1.2,
+                    fps: 0
+                };
+
+                this.setupGUI();
+                this.setupRaycaster();
+                this.setupResizeHandler();
+            }
+
+            setupGUI() {
+                const gui = new GUI({ title: '3D Automata Controls' });
+                
+                const simFolder = gui.addFolder('Simulation');
+                simFolder.add(this.params, 'playing').name('Play/Pause');
+                simFolder.add(this.params, 'speed', 10, 500).name('Speed (ms)');
+                simFolder.add({ randomize: () => this.engine.randomize() }, 'randomize').name('Randomize');
+                simFolder.add({ clear: () => this.engine.clear() }, 'clear').name('Clear');
+                
+                const rulesFolder = gui.addFolder('Rules');
+                rulesFolder.add(this.params, 'birthRules').name('Birth Rules (comma-separated)');
+                rulesFolder.add(this.params, 'survivalRules').name('Survival Rules (comma-separated)');
+                rulesFolder.add({ update: () => {
+                    const birth = this.params.birthRules.split(',').map(Number).filter(n => !isNaN(n));
+                    const survival = this.params.survivalRules.split(',').map(Number).filter(n => !isNaN(n));
+                    this.engine.setRules(birth, survival);
+                }}).name('Apply Rules');
+
+                const visualFolder = gui.addFolder('Visual');
+                visualFolder.addColor(this.params, 'color').name('Cell Color').onChange(c => {
+                    this.visualizer.instancedMesh.material.emissive.set(c);
+                    this.visualizer.instancedMesh.material.color.set(c);
+                });
+                visualFolder.add(this.params, 'bloomStrength', 0, 3).name('Bloom Strength').onChange(v => {
+                    this.visualizer.composer.passes[1].strength = v;
+                });
+
+                const infoFolder = gui.addFolder('Info');
+                infoFolder.open(false);
+            }
+
+            setupRaycaster() {
+                const raycaster = new THREE.Raycaster();
+                const mouse = new THREE.Vector2();
+
+                this.visualizer.renderer.domElement.addEventListener('click', (event) => {
+                    const rect = this.visualizer.renderer.domElement.getBoundingClientRect();
+                    mouse.x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                    mouse.y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+                    raycaster.setFromCamera(mouse, this.visualizer.camera);
+                    const intersects = raycaster.intersectObject(this.visualizer.instancedMesh);
+
+                    if (intersects.length > 0) {
+                        const instanceId = intersects[0].instanceId;
+                        const matrix = new THREE.Matrix4();
+                        this.visualizer.instancedMesh.getMatrixAt(instanceId, matrix);
+                        const position = new THREE.Vector3().setFromMatrixPosition(matrix);
+                        
+                        const offset = (this.engine.size - 1) / 2;
+                        const x = Math.round(position.x + offset);
+                        const y = Math.round(position.y + offset);
+                        const z = Math.round(position.z + offset);
+                        
+                        this.engine.setCell(x, y, z);
+                    }
+                });
+            }
+
+            setupResizeHandler() {
+                window.addEventListener('resize', () => {
+                    this.visualizer.resize(window.innerWidth, window.innerHeight);
+                });
+            }
+
+            updateFPS(fps) {
+                this.params.fps = Math.round(fps);
+                document.getElementById('fps-counter').textContent = `FPS: ${Math.round(fps)}`;
+            }
+        }
+
+        // ============================================
+        // MAIN APPLICATION
+        // ============================================
+        const engine = new AutomataEngine(32, { birth: [3], survival: [2, 3] });
+        const visualizer = new Visualizer(engine);
+        const ui = new UIManager(engine, visualizer);
+
+        let lastTime = performance.now();
+        let frameCount = 0;
+        let fpsTimer = 0;
+        let nextTick = 0;
+
+        function animate(currentTime) {
+            requestAnimationFrame(animate);
+
+            const delta = currentTime - lastTime;
+            lastTime = currentTime;
+            frameCount++;
+
+            if (currentTime - fpsTimer > 1000) {
+                ui.updateFPS(frameCount);
+                frameCount = 0;
+                fpsTimer = currentTime;
+            }
+
+            if (ui.params.playing && currentTime > nextTick) {
+                engine.update();
+                visualizer.update();
+                nextTick = currentTime + ui.params.speed;
+            }
+
+            ui.controls.update();
+            visualizer.render();
+        }
+
+        // Initialize with random state
+        engine.randomize();
+        visualizer.update();
+        animate(performance.now());
+    </script>
+</body>
+</html>
