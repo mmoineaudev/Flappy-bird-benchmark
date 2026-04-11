@@ -1,270 +1,354 @@
-#!/usr/bin/env python3
 """
-Conway's Game of Life - Retro Neon Wave Version
-Python/Pygame implementation with CRT/scanline effects
+Conway's Game of Life - Retro Neon Wave Simulation
+Python/Pygame implementation with configurable rules and retro aesthetics.
 """
 
 import pygame
-import sys
+import random
 import time
-from datetime import datetime
+from typing import List, Tuple, Optional
 
-# Initialize Pygame
-pygame.init()
+# ============================================================================
+# CONFIGURATION
+# ============================================================================
 
-# Constants
-SCREEN_WIDTH = 1200
-SCREEN_HEIGHT = 800
+# Grid configuration
 GRID_WIDTH = 80
 GRID_HEIGHT = 40
 CELL_SIZE = 15
-BORDER = 2  # Border width
-SCANLINE_COUNT = 30
 
-# Colors
-COLOR_BG = (10, 10, 15)      # Dark background
-COLOR_GRID = (20, 20, 30)   # Subtle grid lines
-COLOR_CELL_CYAN = (0, 255, 255)      # Cyan neon
-COLOR_CELL_MAGENTA = (255, 0, 255)   # Magenta neon
-COLOR_CELL_PURPLE = (157, 78, 222)   # Purple neon
-COLOR_TEXT = (200, 200, 230)         # Text color
-COLOR_SCANLINE = (0, 0, 0, 40)       # Semi-transparent for scanlines
+# Visual configuration
+BACKGROUND_COLOR = (10, 10, 15)
+NEON_COLORS = [
+    (0, 255, 255),   # Cyan
+    (255, 0, 255),   # Magenta
+    (157, 78, 222),  # Purple
+]
+GRID_LINE_COLOR = (20, 20, 30)
 
-# Rule parameters (configurable)
-RULE_BIRTH = 3          # Number of neighbors to spawn a cell
-RULE_SURVIVE_MIN = 2    # Minimum neighbors to survive
-RULE_SURVIVE_MAX = 3    # Maximum neighbors to survive
-FPS_TARGET = 10         # Animation speed
+# Game rules (parametrizable)
+DEFAULT_BIRTH_NEIGHBORS = [3]          # Birth rule: cell spawns if exactly N neighbors
+DEFAULT_SURVIVE_MIN_NEIGHBORS = 2      # Minimum neighbors to survive
+DEFAULT_SURVIVE_MAX_NEIGHBORS = 3      # Maximum neighbors to survive
+
+# Animation configuration
+FPS = 10
+MAX_FPS = 60
+
+# ============================================================================
+# GAME OF LIFE LOGIC
+# ============================================================================
 
 class GameOfLife:
-    def __init__(self, width, height):
+    """Conway's Game of Life implementation with configurable rules."""
+    
+    def __init__(self, width: int, height: int):
         self.width = width
         self.height = height
-        self.grid = [[0 for _ in range(width)] for _ in range(height)]
-        self.paused = False
-        self.frame_count = 0
-        self.last_update = time.time()
-        self.current_color = COLOR_CELL_CYAN
-        self.color_cycle_speed = 0.5  # Seconds per color change
-        
-    def get_neighbor_count(self, x, y):
-        """Count alive neighbors for a cell"""
+        self.reset()
+    
+    def reset(self):
+        """Reset grid to empty state."""
+        self.grid = [[0 for _ in range(self.width)] for _ in range(self.height)]
+        self.generation = 0
+    
+    def randomize(self):
+        """Fill grid with random cells."""
+        for y in range(self.height):
+            for x in range(self.width):
+                self.grid[y][x] = 1 if random.random() < 0.2 else 0
+        self.generation = 0
+    
+    def clear(self):
+        """Clear all cells."""
+        self.reset()
+    
+    def toggle_cell(self, x: int, y: int):
+        """Toggle cell state at position."""
+        if 0 <= x < self.width and 0 <= y < self.height:
+            self.grid[y][x] = 1 - self.grid[y][x]
+    
+    def get_neighbors(self, x: int, y: int) -> int:
+        """Count live neighbors for a cell (with toroidal wrapping)."""
         count = 0
-        for i in range(-1, 2):
-            for j in range(-1, 2):
-                if i == 0 and j == 0:
+        for dy in [-1, 0, 1]:
+            for dx in [-1, 0, 1]:
+                if dx == 0 and dy == 0:
                     continue
-                    
-                nx, ny = x + i, y + j
-                # Wrap around (torus topology)
-                if nx < 0:
-                    nx += self.width
-                if ny < 0:
-                    ny += self.height
-                if nx >= self.width:
-                    nx -= self.width
-                if ny >= self.height:
-                    ny -= self.height
-                    
+                nx = (x + dx) % self.width
+                ny = (y + dy) % self.height
                 count += self.grid[ny][nx]
         return count
     
-    def update(self):
-        """Update the grid according to Game of Life rules"""
-        if self.paused:
-            return
-            
+    def update(self, birth_neighbors: List[int] = None,
+               survive_min: int = None, survive_max: int = None) -> bool:
+        """
+        Update grid state using Game of Life rules.
+        
+        Args:
+            birth_neighbors: List of neighbor counts that cause birth (default: [3])
+            survive_min: Minimum neighbors to survive (default: 2)
+            survive_max: Maximum neighbors to survive (default: 3)
+        Returns:
+            True if grid changed, False otherwise
+        """
+        if birth_neighbors is None:
+            birth_neighbors = DEFAULT_BIRTH_NEIGHBORS
+        if survive_min is None:
+            survive_min = DEFAULT_SURVIVE_MIN_NEIGHBORS
+        if survive_max is None:
+            survive_max = DEFAULT_SURVIVE_MAX_NEIGHBORS
+        
         new_grid = [[0 for _ in range(self.width)] for _ in range(self.height)]
+        changed = False
         
         for y in range(self.height):
             for x in range(self.width):
-                neighbors = self.get_neighbor_count(x, y)
+                neighbors = self.get_neighbors(x, y)
+                current = self.grid[y][x]
                 
                 # Apply rules
-                if self.grid[y][x] == 1:
-                    # Cell is alive
-                    if RULE_SURVIVE_MIN <= neighbors <= RULE_SURVIVE_MAX:
+                if current == 0:
+                    # Birth rule: spawn if neighbor count matches birth config
+                    if neighbors in birth_neighbors:
                         new_grid[y][x] = 1
                     else:
                         new_grid[y][x] = 0
                 else:
-                    # Cell is dead
-                    if neighbors == RULE_BIRTH:
+                    # Survival rule: survive if neighbors in range
+                    if survive_min <= neighbors <= survive_max:
                         new_grid[y][x] = 1
                     else:
                         new_grid[y][x] = 0
+                
+                if new_grid[y][x] != current:
+                    changed = True
         
         self.grid = new_grid
-        self.frame_count += 1
-        
-        # Cycle colors periodically
-        current_time = time.time()
-        if (current_time - self.last_update) > self.color_cycle_speed:
-            self.last_update = current_time
-            self.cycle_color()
+        self.generation += 1
+        return changed
     
-    def cycle_color(self):
-        """Cycle between neon colors"""
-        if self.current_color == COLOR_CELL_CYAN:
-            self.current_color = COLOR_CELL_MAGENTA
-        elif self.current_color == COLOR_CELL_MAGENTA:
-            self.current_color = COLOR_CELL_PURPLE
-        else:
-            self.current_color = COLOR_CELL_CYAN
-    
-    def randomize(self):
-        """Fill grid with random cells"""
-        for y in range(self.height):
-            for x in range(self.width):
-                self.grid[y][x] = 1 if pygame.time.get_ticks() % (x * y + 1) < 50 else 0
-    
-    def clear(self):
-        """Clear the grid"""
-        for y in range(self.height):
-            for x in range(self.width):
-                self.grid[y][x] = 0
-    
-    def toggle_cell(self, mouse_x, mouse_y):
-        """Toggle cell state at position"""
-        grid_x = mouse_x // CELL_SIZE
-        grid_y = mouse_y // CELL_SIZE
-        
-        if 0 <= grid_x < self.width and 0 <= grid_y < self.height:
-            self.grid[grid_y][grid_x] = 1 - self.grid[grid_y][grid_x]
-    
-    def get_population(self):
-        """Count live cells"""
+    def get_population(self) -> int:
+        """Count live cells."""
         return sum(sum(row) for row in self.grid)
-
-# Initialize game
-game = GameOfLife(GRID_WIDTH, GRID_HEIGHT)
-screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-pygame.display.set_caption("Game of Life - Retro Neon Wave")
-
-# Set random initial state
-game.randomize()
-
-# FPS clock
-clock = pygame.time.Clock()
-font = pygame.font.SysFont('monospace', 14)
-
-def draw_grid():
-    """Draw the grid with retro effects"""
-    # Fill background
-    screen.fill(COLOR_BG)
     
-    # Draw cells
-    for y in range(game.height):
-        for x in range(game.width):
-            if game.grid[y][x] == 1:
-                # Draw cell with glow effect
-                rect = pygame.Rect(
-                    x * CELL_SIZE, 
-                    y * CELL_SIZE, 
-                    CELL_SIZE - BORDER, 
-                    CELL_SIZE - BORDER
-                )
-                # Draw cell with neon color
-                pygame.draw.rect(screen, game.current_color, rect)
-    
-    # Draw grid lines
-    for x in range(0, SCREEN_WIDTH, CELL_SIZE):
-        pygame.draw.line(screen, COLOR_GRID, (x, 0), (x, SCREEN_HEIGHT), 1)
-    for y in range(0, SCREEN_HEIGHT, CELL_SIZE):
-        pygame.draw.line(screen, COLOR_GRID, (0, y), (SCREEN_WIDTH, y), 1)
+    def set_cell(self, x: int, y: int, state: int):
+        """Set cell state directly."""
+        if 0 <= x < self.width and 0 <= y < self.height:
+            self.grid[y][x] = max(0, min(1, state))
 
-def draw_scanlines():
-    """Draw retro scanline effect"""
-    line_height = SCREEN_HEIGHT // SCANLINE_COUNT
-    for i in range(SCANLINE_COUNT):
-        y = i * line_height
-        alpha = SCANLINE_COUNT - i
-        color_with_alpha = (COLOR_SCANLINE[0], COLOR_SCANLINE[1], COLOR_SCANLINE[2], alpha)
+# ============================================================================
+# RENDERER
+# ============================================================================
+
+class GameRenderer:
+    """Retro neon wave renderer with Pygame."""
+    
+    def __init__(self, game: GameOfLife):
+        self.game = game
+        self.width = game.width * CELL_SIZE
+        self.height = game.height * CELL_SIZE
         
-        # Use per-pixel surface manipulation for scanlines
-        scanline_surface = pygame.Surface((SCREEN_WIDTH, line_height))
-        scanline_surface.fill(color_with_alpha)
-        scanline_surface.set_alpha(alpha // 4)  # Make it subtle
-        screen.blit(scanline_surface, (0, y))
-
-def draw_ui():
-    """Draw on-screen UI elements"""
-    # Stats display
-    stats_y = 10
-    stats_lines = [
-        f"Frame: {game.frame_count}",
-        f"Population: {game.get_population()}",
-        f"FPS: {clock.get_fps():.1f}",
-        f"Rules: B={RULE_BIRTH}, S=[{RULE_SURVIVE_MIN}-{RULE_SURVIVE_MAX}]",
-        f"Grid: {GRID_WIDTH}x{GRID_HEIGHT}",
-        f"Speed: {game.color_cycle_speed:.1f}s/cycle",
-    ]
-    
-    for i, line in enumerate(stats_lines):
-        text = font.render(line, True, COLOR_TEXT)
-        screen.blit(text, (10, stats_y + i * 20))
-    
-    # Controls hint
-    controls_y = SCREEN_HEIGHT - 80
-    controls = [
-        "Controls: [Space] Pause/Resume | [R] Randomize | [C] Clear",
-        "          [+] Speed Up | [-] Slow Down | [Mouse] Toggle Cell"
-    ]
-    
-    for i, line in enumerate(controls):
-        text = font.render(line, True, (150, 150, 180))
-        screen.blit(text, (10, controls_y + i * 20))
-
-def main():
-    global RULE_BIRTH, RULE_SURVIVE_MIN, RULE_SURVIVE_MAX, FPS_TARGET
-    
-    running = True
-    frame_time = 1.0 / FPS_TARGET
-    
-    while running:
-        # Event handling
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
-            
-            elif event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_SPACE:
-                    game.paused = not game.paused
-                
-                elif event.key == pygame.K_r:
-                    game.randomize()
-                
-                elif event.key == pygame.K_c:
-                    game.clear()
-                
-                elif event.key == pygame.K_PLUS or event.key == pygame.K_UP:
-                    FPS_TARGET = min(FPS_TARGET + 5, 60)
-                    frame_time = 1.0 / FPS_TARGET
-                
-                elif event.key == pygame.K_MINUS or event.key == pygame.K_DOWN:
-                    FPS_TARGET = max(FPS_TARGET - 5, 1)
-                    frame_time = 1.0 / FPS_TARGET
-            
-            elif event.type == pygame.MOUSEBUTTONDOWN:
-                if event.button == 1:  # Left click
-                    game.toggle_cell(event.pos[0], event.pos[1])
+        # Initialize Pygame
+        pygame.init()
+        self.screen = pygame.display.set_mode((self.width, self.height))
+        pygame.display.set_caption("Game of Life - Retro Neon Wave")
         
-        # Update game state
-        current_time = time.time()
-        if not game.paused and (current_time - game.last_update) >= frame_time:
-            game.update()
-            game.last_update = current_time
+        # Create grid surface for efficient rendering
+        self.grid_surface = pygame.Surface((self.width, self.height))
         
-        # Render
-        draw_grid()
-        draw_scanlines()
-        draw_ui()
+        # Scanline effect
+        self.scanlines = []
+        for y in range(0, self.height, 4):
+            self.scanlines.append(pygame.Rect(0, y, self.width, 2))
+        
+        # Clock for FPS control
+        self.clock = pygame.time.Clock()
+    
+    def draw_grid(self):
+        """Draw grid lines and background."""
+        self.grid_surface.fill(BACKGROUND_COLOR)
+        
+        # Draw vertical lines
+        for x in range(0, self.width + 1, CELL_SIZE):
+            color = (30, 30, 40) if x % (CELL_SIZE * 5) == 0 else GRID_LINE_COLOR
+            pygame.draw.line(self.grid_surface, color, (x, 0), (x, self.height), 1)
+        
+        # Draw horizontal lines
+        for y in range(0, self.height + 1, CELL_SIZE):
+            color = (30, 30, 40) if y % (CELL_SIZE * 5) == 0 else GRID_LINE_COLOR
+            pygame.draw.line(self.grid_surface, color, (0, y), (self.width, y), 1)
+    
+    def draw_cells(self):
+        """Draw live cells with neon glow effect."""
+        for y in range(self.game.height):
+            for x in range(self.game.width):
+                if self.game.grid[y][x] == 1:
+                    # Calculate neon color based on position and generation
+                    color_idx = (x + y + self.game.generation // 5) % len(NEON_COLORS)
+                    color = NEON_COLORS[color_idx]
+                    
+                    # Draw cell with glow effect
+                    rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+                    pygame.draw.rect(self.grid_surface, color, rect)
+                    
+                    # Add outer glow ring
+                    glow_rect = pygame.Rect(rect.left - 1, rect.top - 1, 
+                                          rect.width + 2, rect.height + 2)
+                    glow_color = tuple(min(255, int(c * 0.6)) for c in color)
+                    pygame.draw.rect(self.grid_surface, glow_color, glow_rect, 1)
+    
+    def draw_ui(self, fps: float):
+        """Draw on-screen UI elements."""
+        font = pygame.font.SysFont('monospace', 14)
+        
+        # Statistics
+        stats = [
+            f"Frame: {self.game.generation}",
+            f"Population: {self.game.get_population()}",
+            f"FPS: {fps:.1f}",
+            f"Rules: B{self.game.DEFAULT_BIRTH_NEIGHBORS}, S{self.game.DEFAULT_SURVIVE_MIN_NEIGHBORS}-{self.game.DEFAULT_SURVIVE_MAX_NEIGHBORS}"
+        ]
+        
+        y_pos = 5
+        for text in stats:
+            label = font.render(text, True, (200, 200, 220))
+            self.screen.blit(label, (10, y_pos))
+            y_pos += 20
+    
+    def draw_scanlines(self):
+        """Draw retro scanline overlay."""
+        for rect in self.scanlines:
+            self.screen.fill((0, 0, 0, 50), rect, special_flags=pygame.SRCALPHA)
+    
+    def render(self, fps: float, paused: bool = False):
+        """Render entire frame."""
+        # Draw grid and cells
+        self.draw_grid()
+        self.draw_cells()
+        
+        # Copy to main screen
+        self.screen.blit(self.grid_surface, (0, 0))
+        
+        # Draw scanlines
+        self.draw_scanlines()
+        
+        # Draw UI
+        self.draw_ui(fps)
+        
+        # Pause indicator
+        if paused:
+            font = pygame.font.SysFont('monospace', 48)
+            pause_label = font.render("PAUSED", True, (255, 255, 255))
+            rect = pause_label.get_rect(center=(self.width // 2, self.height // 2))
+            self.screen.blit(pause_label, rect)
         
         pygame.display.flip()
-        clock.tick(FPS_TARGET)
     
-    pygame.quit()
-    sys.exit(0)
+    def handle_events(self) -> Tuple[bool, bool]:
+        """Handle input events. Returns (should_exit, paused)."""
+        should_exit = False
+        mouse_pressed = False
+        
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                should_exit = True
+            elif event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    return True, True  # Toggle pause
+                elif event.key == pygame.K_r:
+                    self.game.randomize()
+                elif event.key == pygame.K_c:
+                    self.game.clear()
+                elif event.key == pygame.K_ESCAPE:
+                    should_exit = True
+            elif event.type == pygame.MOUSEBUTTONDOWN:
+                if event.button == 1:  # Left click
+                    mouse_pressed = True
+                    x, y = event.pos
+                    grid_x = x // CELL_SIZE
+                    grid_y = y // CELL_SIZE
+                    self.game.toggle_cell(grid_x, grid_y)
+        
+        return should_exit, False
+    
+    def get_mouse_position(self) -> Optional[Tuple[int, int]]:
+        """Get current mouse position in grid coordinates."""
+        mouse_state = pygame.mouse.get_pressed()
+        if mouse_state[0]:  # Left button pressed
+            x, y = pygame.mouse.get_pos()
+            grid_x = x // CELL_SIZE
+            grid_y = y // CELL_SIZE
+            if 0 <= grid_x < self.game.width and 0 <= grid_y < self.game.height:
+                return (grid_x, grid_y)
+        return None
+    
+    def draw_drawing_cells(self, mouse_pos: Optional[Tuple[int, int]]):
+        """Draw cells being drawn with mouse."""
+        if mouse_pos:
+            x, y = mouse_pos
+            rect = pygame.Rect(x * CELL_SIZE, y * CELL_SIZE, CELL_SIZE, CELL_SIZE)
+            pygame.draw.rect(self.grid_surface, (100, 255, 255), rect, 2)
+    
+    def cleanup(self):
+        """Clean up resources."""
+        pygame.quit()
+
+# ============================================================================
+# MAIN APPLICATION
+# ============================================================================
+
+def main():
+    """Main application loop."""
+    # Initialize game
+    game = GameOfLife(GRID_WIDTH, GRID_HEIGHT)
+    game.randomize()
+    
+    # Initialize renderer
+    renderer = GameRenderer(game)
+    
+    # Game state
+    paused = False
+    fps = FPS
+    last_update = time.time()
+    
+    print("Game started - Press SPACE to pause, R to randomize, C to clear")
+    print("Controls: SPACE=pause, R=randomize, C=clear, +/-=speed, ESC=exit")
+    
+    try:
+        while True:
+            # Handle input
+            should_exit, space_pressed = renderer.handle_events()
+            
+            # Handle speed controls
+            keys = pygame.key.get_pressed()
+            if keys[pygame.K_PLUS] or keys[pygame.K_PLUS]:
+                fps = min(MAX_FPS, fps + 5)
+            if keys[pygame.K_MINUS]:
+                fps = max(1, fps - 5)
+            
+            # Handle drag drawing
+            mouse_pos = renderer.get_mouse_position()
+            if mouse_pos:
+                game.set_cell(mouse_pos[0], mouse_pos[1], 1)
+            
+            # Update game logic
+            current_time = time.time()
+            if not paused and current_time - last_update >= 1.0 / fps:
+                game.update()
+                last_update = current_time
+            
+            # Render frame
+            renderer.render(fps, paused)
+            
+            if should_exit:
+                break
+                
+            # Limit FPS for rendering
+            renderer.clock.tick(60)
+    
+    finally:
+        renderer.cleanup()
 
 if __name__ == "__main__":
     main()
