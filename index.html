@@ -356,6 +356,8 @@
         // Initialize with random state
         engine.randomize();
         visualizer.update();
+        ui.controls.update();
+        visualizer.render();
         animate(performance.now());
     </script>
 </body>
