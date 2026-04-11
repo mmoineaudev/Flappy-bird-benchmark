@@ -256,32 +256,26 @@
             setupGUI() {
                 const gui = new GUI({ title: '3D Automata Controls' });
                 
-                const simFolder = gui.addFolder('Simulation');
-                simFolder.add(this.params, 'playing').name('Play/Pause');
-                simFolder.add(this.params, 'speed', 10, 500).name('Speed (ms)');
-                simFolder.add({ randomize: () => this.engine.randomize() }, 'randomize').name('Randomize');
-                simFolder.add({ clear: () => this.engine.clear() }, 'clear').name('Clear');
+                gui.add(this.params, 'playing').name('Play/Pause');
+                gui.add(this.params, 'speed', 10, 500).name('Speed (ms)');
+                gui.add({ randomize: () => this.engine.randomize() }, 'randomize').name('Randomize');
+                gui.add({ clear: () => this.engine.clear() }, 'clear').name('Clear');
                 
-                const rulesFolder = gui.addFolder('Rules');
-                rulesFolder.add(this.params, 'birthRules').name('Birth Rules (comma-separated)');
-                rulesFolder.add(this.params, 'survivalRules').name('Survival Rules (comma-separated)');
-                rulesFolder.add({ update: () => {
+                gui.add(this.params, 'birthRules').name('Birth Rules (comma-separated)');
+                gui.add(this.params, 'survivalRules').name('Survival Rules (comma-separated)');
+                gui.add({ update: () => {
                     const birth = this.params.birthRules.split(',').map(Number).filter(n => !isNaN(n));
                     const survival = this.params.survivalRules.split(',').map(Number).filter(n => !isNaN(n));
                     this.engine.setRules(birth, survival);
                 }}).name('Apply Rules');
 
-                const visualFolder = gui.addFolder('Visual');
-                visualFolder.addColor(this.params, 'color').name('Cell Color').onChange(c => {
+                gui.addColor(this.params, 'color').name('Cell Color').onChange(c => {
                     this.visualizer.instancedMesh.material.emissive.set(c);
                     this.visualizer.instancedMesh.material.color.set(c);
                 });
-                visualFolder.add(this.params, 'bloomStrength', 0, 3).name('Bloom Strength').onChange(v => {
+                gui.add(this.params, 'bloomStrength', 0, 3).name('Bloom Strength').onChange(v => {
                     this.visualizer.composer.passes[1].strength = v;
                 });
-
-                const infoFolder = gui.addFolder('Info');
-                infoFolder.open(false);
             }
 
             setupRaycaster() {
