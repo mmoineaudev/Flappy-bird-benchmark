@@ -263,12 +263,11 @@
                 gui.add({ clear: () => this.engine.clear() }, 'clear');
                 
                 gui.add(this.params, 'birthRules');
-                gui.add(this.params, 'survivalRules');
-                gui.add({ applyRules: () => {
+                gui.add(this.params, 'survivalRules').onChange(() => {
                     const birth = this.params.birthRules.split(',').map(Number).filter(n => !isNaN(n));
                     const survival = this.params.survivalRules.split(',').map(Number).filter(n => !isNaN(n));
                     this.engine.setRules(birth, survival);
-                }});
+                });
 
                 gui.addColor(this.params, 'color').onChange(c => {
                     this.visualizer.instancedMesh.material.emissive.set(c);
