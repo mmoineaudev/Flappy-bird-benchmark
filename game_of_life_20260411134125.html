@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Conway's Game of Life - Three.js Version</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: #000;
+            font-family: 'Courier New', monospace;
+        }
+        #container {
+            position: relative;
+            width: 100vw;
+            height: 100vh;
+        }
+        #ui {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            color: #00ffff;
+            font-size: 14px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #00ffff;
+        }
+        #controls {
+            position: absolute;
+            bottom: 10px;
+            left: 10px;
+            color: #ff00ff;
+            font-size: 12px;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #ff00ff;
+        }
+        canvas {
+            display: block;
+        }
+        .scanline {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 50;
+            background: repeating-linear-gradient(
+                to bottom,
+                transparent 0px,
+                transparent 1px,
+                rgba(0, 0, 0, 0.1) 1px,
+                rgba(0, 0, 0, 0.1) 2px
+            );
+            mix-blend-mode: multiply;
+        }
+        .glow {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 40;
+            opacity: 0.3;
+        }
+    </style>
+</head>
+<body>
+    <div id="container">
+        <div id="ui">
+            <h2>Conway's Game of Life - Three.js</h2>
+            <div id="stats">Generation: 0 | Population: 0</div>
+            <div id="rules">Rules: B3/S2-3</div>
+        </div>
+        <div id="controls">
+            <div>Controls:</div>
+            <div>Space - Pause/Resume</div>
+            <div>R - Randomize</div>
+            <div>C - Clear</div>
+            <div>Mouse Drag - Draw Cells</div>
+            <div>Scroll - Zoom</div>
+        </div>
+        <div class="scanline"></div>
+        <div class="glow"></div>
+    </div>
+
+    <!-- Include Three.js from CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script>
+        // Game of Life implementation with Three.js
+        class GameOfLife3D {
+            constructor() {
+                // Initialize Three.js scene
+                this.scene = new THREE.Scene();
+                this.camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+                this.renderer = new THREE.WebGLRenderer({ antialias: true });
+                this.renderer.setSize(window.innerWidth, window.innerHeight);
+                this.renderer.setPixelRatio(window.devicePixelRatio);
+                document.getElementById('container').appendChild(this.renderer.domElement);
+                
+                // Set up camera
+                this.camera.position.z = 50;
+                this.camera.position.y = 20;
+                this.camera.lookAt(0, 0, 0);
+                
+                // Game state
+                this.gridWidth = 80;
+                this.gridHeight = 40;
+                this.cellSize = 1.5;
+                this.generation = 0;
+                this.population = 0;
+                this.running = true;
+                this.speed = 10;
+                this.birthRule = 3;
+                this.survivalMin = 2;
+                this.survivalMax = 3;
+                
+                // Grid data
+                this.grid = Array(this.gridHeight).fill().map(() => Array(this.gridWidth).fill(0));
+                this.nextGrid = Array(this.gridHeight).fill().map(() => Array(this.gridWidth).fill(0));
+                
+                // Three.js objects
+                this.cubes = [];
+                this.materials = {
+                    alive: new THREE.MeshBasicMaterial({ 
+                        color: 0x00ffff,
+                        emissive: 0x00ffff,
+                        emissiveIntensity: 1.0
+                    }),
+                    dead: new THREE.MeshBasicMaterial({ 
+                        color: 0x000000,
+                        emissive: 0x000000
+                    })
+                };
+                
+                // Create grid
+                this.createGrid();
+                
+                // Event listeners
+                this.setupEventListeners();
+                
+                // Start animation loop
+                this.animate();
+            }
+            
+            createGrid() {
+                // Clear existing cubes
+                this.cubes.forEach(cube => this.scene.remove(cube));
+                this.cubes = [];
+                
+                // Create new cubes
+                for (let y = 0; y < this.gridHeight; y++) {
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        const geometry = new THREE.BoxGeometry(this.cellSize, this.cellSize, this.cellSize);
+                        const material = this.grid[y][x] ? this.materials.alive : this.materials.dead;
+                        const cube = new THREE.Mesh(geometry, material);
+                        
+                        // Position the cube in 3D space
+                        cube.position.x = (x - this.gridWidth / 2) * (this.cellSize + 0.1);
+                        cube.position.y = (this.gridHeight / 2 - y) * (this.cellSize + 0.1);
+                        cube.position.z = 0;
+                        
+                        this.scene.add(cube);
+                        this.cubes.push(cube);
+                    }
+                }
+            }
+            
+            randomize() {
+                for (let y = 0; y < this.gridHeight; y++) {
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        this.grid[y][x] = Math.random() > 0.7 ? 1 : 0;
+                    }
+                }
+                this.generation = 0;
+                this.updatePopulation();
+                this.updateVisualization();
+            }
+            
+            clear() {
+                for (let y = 0; y < this.gridHeight; y++) {
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        this.grid[y][x] = 0;
+                    }
+                }
+                this.generation = 0;
+                this.updatePopulation();
+                this.updateVisualization();
+            }
+            
+            updatePopulation() {
+                this.population = 0;
+                for (let y = 0; y < this.gridHeight; y++) {
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        this.population += this.grid[y][x];
+                    }
+                }
+            }
+            
+            countNeighbors(x, y) {
+                let count = 0;
+                for (let dy = -1; dy <= 1; dy++) {
+                    for (let dx = -1; dx <= 1; dx++) {
+                        if (dx === 0 && dy === 0) continue;
+                        const nx = (x + dx + this.gridWidth) % this.gridWidth;
+                        const ny = (y + dy + this.gridHeight) % this.gridHeight;
+                        count += this.grid[ny][nx];
+                    }
+                }
+                return count;
+            }
+            
+            update() {
+                if (!this.running) return;
+                
+                // Apply Game of Life rules
+                for (let y = 0; y < this.gridHeight; y++) {
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        const neighbors = this.countNeighbors(x, y);
+                        
+                        if (this.grid[y][x] === 1) {
+                            // Cell is alive
+                            if (neighbors < this.survivalMin || neighbors > this.survivalMax) {
+                                this.nextGrid[y][x] = 0; // Dies
+                            } else {
+                                this.nextGrid[y][x] = 1; // Survives
+                            }
+                        } else {
+                            // Cell is dead
+                            if (neighbors === this.birthRule) {
+                                this.nextGrid[y][x] = 1; // Born
+                            } else {
+                                this.nextGrid[y][x] = 0; // Stays dead
+                            }
+                        }
+                    }
+                }
+                
+                // Swap grids
+                [this.grid, this.nextGrid] = [this.nextGrid, this.grid];
+                this.generation++;
+                this.updatePopulation();
+                this.updateVisualization();
+            }
+            
+            updateVisualization() {
+                let index = 0;
+                for (let y = 0; y < this.gridHeight; y++) {
+                    for (let x = 0; x < this.gridWidth; x++) {
+                        const cube = this.cubes[index];
+                        if (this.grid[y][x] === 1) {
+                            // Make alive
+                            cube.material = this.materials.alive;
+                            cube.visible = true;
+                        } else {
+                            // Make dead
+                            cube.material = this.materials.dead;
+                            cube.visible = false;
+                        }
+                        index++;
+                    }
+                }
+            }
+            
+            toggleCell(x, y) {
+                if (x >= 0 && x < this.gridWidth && y >= 0 && y < this.gridHeight) {
+                    this.grid[y][x] = 1 - this.grid[y][x];
+                    this.updatePopulation();
+                    this.updateVisualization();
+                }
+            }
+            
+            setupEventListeners() {
+                // Keyboard controls
+                window.addEventListener('keydown', (event) => {
+                    switch (event.key) {
+                        case ' ':
+                            this.running = !this.running;
+                            break;
+                        case 'r':
+                        case 'R':
+                            this.randomize();
+                            break;
+                        case 'c':
+                        case 'C':
+                            this.clear();
+                            break;
+                    }
+                });
+                
+                // Mouse controls
+                let isDrawing = false;
+                let lastX, lastY;
+                
+                this.renderer.domElement.addEventListener('mousedown', (event) => {
+                    isDrawing = true;
+                    this.handleMouse(event);
+                });
+                
+                this.renderer.domElement.addEventListener('mousemove', (event) => {
+                    if (isDrawing) {
+                        this.handleMouse(event);
+                    }
+                });
+                
+                this.renderer.domElement.addEventListener('mouseup', () => {
+                    isDrawing = false;
+                });
+                
+                // Zoom with scroll
+                this.renderer.domElement.addEventListener('wheel', (event) => {
+                    event.preventDefault();
+                    const zoomSpeed = 0.1;
+                    if (event.deltaY < 0) {
+                        this.camera.position.z *= (1 - zoomSpeed);
+                    } else {
+                        this.camera.position.z *= (1 + zoomSpeed);
+                    }
+                    this.camera.position.z = Math.max(10, Math.min(100, this.camera.position.z));
+                });
+                
+                // Window resize
+                window.addEventListener('resize', () => {
+                    this.camera.aspect = window.innerWidth / window.innerHeight;
+                    this.camera.updateProjectionMatrix();
+                    this.renderer.setSize(window.innerWidth, window.innerHeight);
+                });
+            }
+            
+            handleMouse(event) {
+                const rect = this.renderer.domElement.getBoundingClientRect();
+                const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                
+                // Convert mouse coordinates to grid position
+                const gridX = Math.floor((x * this.gridWidth / 2) + this.gridWidth / 2);
+                const gridY = Math.floor((-y * this.gridHeight / 2) + this.gridHeight / 2);
+                
+                this.toggleCell(gridX, gridY);
+            }
+            
+            animate() {
+                requestAnimationFrame(() => this.animate());
+                
+                // Update game state
+                if (this.running) {
+                    this.update();
+                }
+                
+                // Update UI stats
+                document.getElementById('stats').textContent = 
+                    `Generation: ${this.generation} | Population: ${this.population}`;
+                document.getElementById('rules').textContent = 
+                    `Rules: B${this.birthRule}/S${this.survivalMin}-${this.survivalMax}`;
+                
+                // Render scene
+                this.renderer.render(this.scene, this.camera);
+            }
+        }
+        
+        // Initialize the game when page loads
+        window.addEventListener('load', () => {
+            const game = new GameOfLife3D();
+        });
+    </script>
+</body>
+</html>
