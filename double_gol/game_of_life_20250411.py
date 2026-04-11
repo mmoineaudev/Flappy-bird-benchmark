@@ -155,12 +155,17 @@ class GameRenderer:
         pygame.display.set_caption("Game of Life - Retro Neon Wave")
         
         # Create grid surface for efficient rendering
-        self.grid_surface = pygame.Surface((self.width, self.height))
+        self.grid_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
         
-        # Scanline effect
-        self.scanlines = []
+        # Create scanline surface with alpha
+        self.scanline_surface = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        self.scanline_surface.set_colorkey(None)  # Enable alpha blending
+        
+        # Draw scanlines on the surface
+        self.scanline_surface.fill((0, 0, 0, 0))  # Clear with transparency
         for y in range(0, self.height, 4):
-            self.scanlines.append(pygame.Rect(0, y, self.width, 2))
+            rect = pygame.Rect(0, y, self.width, 2)
+            pygame.draw.rect(self.scanline_surface, (0, 0, 0, 50), rect)
         
         # Clock for FPS control
         self.clock = pygame.time.Clock()
