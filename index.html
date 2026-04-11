@@ -82,9 +82,9 @@
                 [this.currentBuffer, this.nextBuffer] = [this.nextBuffer, this.currentBuffer];
             }
 
-            randomize() {
+            randomize(density = 0.3) {
                 for (let i = 0; i < this.bufferA.length; i++) {
-                    this.bufferA[i] = Math.random() > 0.7 ? 1 : 0;
+                    this.bufferA[i] = Math.random() > (1 - density) ? 1 : 0;
                 }
                 this.bufferB.fill(0);
             }
@@ -354,8 +354,8 @@
             visualizer.render();
         }
 
-        // Initialize with random state
-        engine.randomize();
+        // Initialize with random state at lower density
+        engine.randomize(0.3);
         visualizer.update();
         ui.controls.update();
         visualizer.render();
