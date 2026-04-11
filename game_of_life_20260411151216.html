@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Game of Life - Retro Neon 3D</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #0a0a0f 0%, #1a1a2e 100%);
+            overflow: hidden;
+            font-family: 'Courier New', monospace;
+        }
+        
+        #canvas-container {
+            width: 100vw;
+            height: 100vh;
+        }
+        
+        #gui {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 15, 0.9);
+            padding: 20px;
+            border: 2px solid #00ffff;
+            border-radius: 10px;
+            color: #00ffff;
+            min-width: 280px;
+        }
+        
+        #gui h2 {
+            margin-bottom: 15px;
+            text-shadow: 0 0 10px #00ffff;
+        }
+        
+        .control-group {
+            margin-bottom: 15px;
+        }
+        
+        .control-group label {
+            display: block;
+            margin-bottom: 5px;
+            color: #ff00ff;
+        }
+        
+        .control-group input[type="range"] {
+            width: 100%;
+        }
+        
+        .stat-row {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 8px;
+        }
+        
+        .stat-value {
+            color: #9d4edd;
+            font-weight: bold;
+        }
+        
+        #controls-hint {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            background: rgba(10, 10, 15, 0.9);
+            padding: 15px;
+            border: 2px solid #ff00ff;
+            border-radius: 10px;
+            color: #ff00ff;
+            font-size: 14px;
+        }
+        
+        .scanline {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            background: repeating-linear-gradient(
+                0deg,
+                rgba(0, 0, 0, 0.15),
+                rgba(0, 0, 0, 0.15) 1px,
+                transparent 1px,
+                transparent 2px
+            );
+            z-index: 100;
+        }
+        
+        button {
+            background: linear-gradient(45deg, #00ffff, #9d4edd);
+            border: none;
+            padding: 8px 16px;
+            color: #0a0a0f;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 5px;
+            margin-right: 10px;
+            margin-bottom: 10px;
+        }
+        
+        button:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 15px #00ffff;
+        }
+    </style>
+</head>
+<body>
+    <div id="scanline" class="scanline"></div>
+    
+    <div id="gui">
+        <h2>🎮 Game of Life</h2>
+        
+        <div class="stat-row">
+            <span>Frame:</span>
+            <span id="frame-count" class="stat-value">0</span>
+        </div>
+        <div class="stat-row">
+            <span>Population:</span>
+            <span id="population" class="stat-value">0</span>
+        </div>
+        
+        <div class="control-group">
+            <label>Grid Size: <span id="grid-size-val">60</span></label>
+            <input type="range" id="grid-size" min="20" max="100" value="60">
+        </div>
+        
+        <div class="control-group">
+            <label>Birth Rule: <span id="birth-val">3</span></label>
+            <input type="range" id="birth-rule" min="1" max="6" value="3">
+        </div>
+        
+        <div class="control-group">
+            <label>Speed: <span id="speed-val">5</span></label>
+            <input type="range" id="speed" min="1" max="10" value="5">
+        </div>
+        
+        <button id="random-btn">Randomize (R)</button>
+        <button id="clear-btn">Clear (C)</button>
+    </div>
+    
+    <div id="controls-hint">
+        Space: Pause/Resume<br>
+        R: Randomize<br>
+        C: Clear<br>
+        Drag: Draw cells<br>
+        Scroll: Zoom
+    </div>
+    
+    <div id="canvas-container"></div>
+    
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+            "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+    }
+    </script>
+    
+    <script type="module">
+        import * as THREE from 'three';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        
+        // Configuration
+        let GRID_SIZE = 60;
+        const CELL_SIZE = 15;
+        const BIRTH_RULE = 3;
+        const SURVIVE_MIN = 2;
+        const SURVIVE_MAX = 3;
+        
+        // Colors
+        const COLORS = [
+            new THREE.Color(0x00ffff),  // Cyan
+            new THREE.Color(0xff00ff),  // Magenta
+            new THREE.Color(0x9d4edd)   // Purple
+        ];
+        
+        // State
+        let grid = [];
+        let paused = false;
+        let frameCount = 0;
+        let animationSpeed = 200; // ms between updates
+        let lastUpdate = 0;
+        let mouseDown = false;
+        let zoom = 1;
+        
+        // Scene setup
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x0a0a0f);
+        
+        const camera = new THREE.PerspectiveCamera(
+            60,
+            window.innerWidth / window.innerHeight,
+            0.1,
+            1000
+        );
+        camera.position.z = 50;
+        camera.rotation.x = 0.3;
+        
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        container.appendChild(renderer.domElement);
+        
+        // Post-processing for bloom effect
+        const renderScene = new RenderPass(scene, camera);
+        const bloomPass = new UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            1.5,
+            0.4,
+            0.85
+        );
+        bloomPass.threshold = 0;
+        bloomPass.strength = 1.2;
+        bloomPass.radius = 0.5;
+        
+        const composer = new EffectComposer(renderer);
+        composer.addPass(renderScene);
+        composer.addPass(bloomPass);
+        
+        // Create instanced mesh for cells
+        const geometry = new THREE.BoxGeometry(CELL_SIZE * 0.9, CELL_SIZE * 0.9, CELL_SIZE * 0.9);
+        const material = new THREE.MeshStandardMaterial({
+            color: COLORS[0],
+            emissive: COLORS[0],
+            emissiveIntensity: 2,
+            roughness: 0.3,
+            metalness: 0.7
+        });
+        
+        const maxCells = GRID_SIZE * GRID_SIZE;
+        const instancedMesh = new THREE.InstancedMesh(geometry, material, maxCells);
+        instancedMesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+        scene.add(instancedMesh);
+        
+        // Grid line visualization
+        const gridHelper = new THREE.GridHelper(
+            GRID_SIZE * CELL_SIZE,
+            GRID_SIZE,
+            0x303040,
+            0x202030
+        );
+        gridHelper.rotation.x = 0.3;
+        scene.add(gridHelper);
+        
+        // Lighting
+        const ambientLight = new THREE.AmbientLight(0x404040, 1);
+        scene.add(ambientLight);
+        
+        const pointLight = new THREE.PointLight(0x00ffff, 2, 100);
+        pointLight.position.set(50, 50, 50);
+        scene.add(pointLight);
+        
+        // Initialize grid
+        function initGrid() {
+            grid = [];
+            for (let y = 0; y < GRID_SIZE; y++) {
+                grid[y] = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    grid[y][x] = Math.random() < 0.3 ? 1 : 0;
+                }
+            }
+            updateMesh();
+        }
+        
+        // Update instanced mesh
+        function updateMesh() {
+            const dummy = new THREE.Object3D();
+            let index = 0;
+            
+            for (let y = 0; y < GRID_SIZE; y++) {
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    if (grid[y][x]) {
+                        const hueCycle = (x + y + Math.floor(frameCount / 10)) % 3;
+                        material.color.copy(COLORS[hueCycle]);
+                        material.emissive.copy(COLORS[hueCycle]);
+                        
+                        dummy.position.set(
+                            (x - GRID_SIZE / 2) * CELL_SIZE,
+                            (y - GRID_SIZE / 2) * CELL_SIZE,
+                            0
+                        );
+                        dummy.scale.set(zoom, zoom, zoom);
+                        dummy.updateMatrix();
+                        instancedMesh.setMatrixAt(index++, dummy.matrix);
+                    }
+                }
+            }
+            
+            instancedMesh.count = index;
+            instancedMesh.instanceMatrix.needsUpdate = true;
+        }
+        
+        // Count neighbors
+        function countNeighbors(x, y) {
+            let count = 0;
+            for (let dy = -1; dy <= 1; dy++) {
+                for (let dx = -1; dx <= 1; dx++) {
+                    if (dx === 0 && dy === 0) continue;
+                    const nx = (x + dx + GRID_SIZE) % GRID_SIZE;
+                    const ny = (y + dy + GRID_SIZE) % GRID_SIZE;
+                    count += grid[ny][nx];
+                }
+            }
+            return count;
+        }
+        
+        // Update simulation
+        function update() {
+            if (paused) return;
+            
+            const newGrid = [];
+            for (let y = 0; y < GRID_SIZE; y++) {
+                newGrid[y] = [];
+                for (let x = 0; x < GRID_SIZE; x++) {
+                    const neighbors = countNeighbors(x, y);
+                    const current = grid[y][x];
+                    
+                    if (current && neighbors >= SURVIVE_MIN && neighbors <= SURVIVE_MAX) {
+                        newGrid[y][x] = 1;
+                    } else if (!current && neighbors === BIRTH_RULE) {
+                        newGrid[y][x] = 1;
+                    } else {
+                        newGrid[y][x] = 0;
+                    }
+                }
+            }
+            
+            grid = newGrid;
+            frameCount++;
+            updateMesh();
+            updateUI();
+        }
+        
+        // Update UI
+        function updateUI() {
+            document.getElementById('frame-count').textContent = frameCount;
+            const population = grid.flat().reduce((a, b) => a + b, 0);
+            document.getElementById('population').textContent = population;
+        }
+        
+        // Randomize
+        function randomize() {
+            initGrid();
+        }
+        
+        // Clear
+        function clear() {
+            grid = Array(GRID_SIZE).fill().map(() => Array(GRID_SIZE).fill(0));
+            updateMesh();
+            updateUI();
+        }
+        
+        // Get grid position from mouse
+        function getGridPosition(event) {
+            const rect = renderer.domElement.getBoundingClientRect();
+            const mouseX = (event.clientX - rect.left) / rect.width * 2 - 1;
+            const mouseY = -(event.clientY - rect.top) / rect.height * 2 + 1;
+            
+            const raycaster = new THREE.Raycaster();
+            raycaster.setFromCamera(mouseX, mouseY);
+            
+            const plane = new THREE.Plane(new THREE.Vector3(0, 0, 1), 0);
+            const intersectPoint = new THREE.Vector3();
+            plane.intersectRay(raycaster.ray, intersectPoint);
+            
+            if (intersectPoint) {
+                const x = Math.floor(intersectPoint.x / CELL_SIZE + GRID_SIZE / 2);
+                const y = Math.floor(-intersectPoint.y / CELL_SIZE + GRID_SIZE / 2);
+                return { x, y };
+            }
+            return null;
+        }
+        
+        // Event listeners
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        });
+        
+        document.addEventListener('keydown', (e) => {
+            if (e.key === ' ') {
+                e.preventDefault();
+                paused = !paused;
+            } else if (e.key === 'r' || e.key === 'R') {
+                randomize();
+            } else if (e.key === 'c' || e.key === 'C') {
+                clear();
+            }
+        });
+        
+        document.addEventListener('mousedown', (e) => {
+            if (e.target.closest('#gui')) return;
+            mouseDown = true;
+            const pos = getGridPosition(e);
+            if (pos && grid[pos.y] && grid[pos.y][pos.x] !== undefined) {
+                grid[pos.y][pos.x] = 1;
+                updateMesh();
+            }
+        });
+        
+        document.addEventListener('mousemove', (e) => {
+            if (!mouseDown) return;
+            const pos = getGridPosition(e);
+            if (pos && grid[pos.y] && grid[pos.y][pos.x] !== undefined) {
+                grid[pos.y][pos.x] = 1;
+                updateMesh();
+            }
+        });
+        
+        document.addEventListener('mouseup', () => {
+            mouseDown = false;
+        });
+        
+        document.addEventListener('wheel', (e) => {
+            zoom += e.deltaY * -0.001;
+            zoom = Math.max(0.5, Math.min(2, zoom));
+            updateMesh();
+        });
+        
+        // GUI controls
+        document.getElementById('grid-size').addEventListener('input', (e) => {
+            GRID_SIZE = parseInt(e.target.value);
+            document.getElementById('grid-size-val').textContent = GRID_SIZE;
+            initGrid();
+        });
+        
+        document.getElementById('birth-rule').addEventListener('input', (e) => {
+            BIRTH_RULE = parseInt(e.target.value);
+            document.getElementById('birth-val').textContent = BIRTH_RULE;
+        });
+        
+        document.getElementById('speed').addEventListener('input', (e) => {
+            const speed = parseInt(e.target.value);
+            document.getElementById('speed-val').textContent = speed;
+            animationSpeed = 600 - speed * 50;
+        });
+        
+        document.getElementById('random-btn').addEventListener('click', randomize);
+        document.getElementById('clear-btn').addEventListener('click', clear);
+        
+        // Animation loop
+        function animate(time) {
+            requestAnimationFrame(animate);
+            
+            if (time - lastUpdate > animationSpeed) {
+                update();
+                lastUpdate = time;
+            }
+            
+            composer.render();
+        }
+        
+        // Start
+        initGrid();
+        updateUI();
+        animate(0);
+    </script>
+</body>
+</html>
