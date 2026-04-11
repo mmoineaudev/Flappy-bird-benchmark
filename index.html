@@ -263,7 +263,7 @@
                 
                 gui.add(this.params, 'birthRules');
                 gui.add(this.params, 'survivalRules');
-                gui.add({ update: () => {
+                gui.add({ applyRules: () => {
                     const birth = this.params.birthRules.split(',').map(Number).filter(n => !isNaN(n));
                     const survival = this.params.survivalRules.split(',').map(Number).filter(n => !isNaN(n));
                     this.engine.setRules(birth, survival);
