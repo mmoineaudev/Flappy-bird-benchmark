@@ -2,76 +2,43 @@
 
 Create a 3D Conway's Game of Life simulation with the following ordered implementation checklist:
 
-**IMPLEMENTATION CHECKLIST:**
+it's the same as the classic 2D version, but this time it spreads in a 3D space with cubic cells.
 
-1. **Setup & Foundation**
-   - Initialize Three.js scene with WebGL renderer
-   - Set up camera with orbit controls
-   - Create responsive window resize handling
-   - Implement basic lighting system
-   - Add retro UI framework with neon styling
+## Detailed specifications
 
-2. **Core Simulation Engine**
-   - Design 3D grid data structure (3D array or sparse representation)
-   - Implement Conway's Game of Life rules engine
-   - Create cell class with state management
-   - Build grid update algorithm with proper boundary handling
-   - Add initial pattern generation (random or predefined)
+**Objective**: Develop a high-performance, 3D Volumetric Cellular Automata simulation (a 3D version of Conway's Game of Life) using Three.js.
 
-3. **3D Visualization**
-   - Create 3D cell geometry (cubes/voxels)
-   - Implement neon glow shader/materials
-   - Add retro CRT scanline overlay effect
-   - Create particle trail systems for active cells
-   - Implement color cycling and pulsing effects
+**1. Simulation Logic (The Engine)**:
+- **Grid Structure**: Implement a 3D voxel grid (X, Y, Z).
+- **Neighborhood Logic**: Use the Moore neighborhood extended to 3D (counting the 26 surrounding neighbors).
+- **Rule System**: Implement a dynamic rule engine where the user can define "Birth" and "Survival" thresholds (e.g., B5/S4,5 or the standard B3/S23 adapted for 3D).
+- **State Management**: Use a double-buffering approach (two arrays/grids) to calculate the next generation without mutating the current state mid-calculation.
+- **Performance**: Because the voxel count can grow quickly, use `THREE.InstancedMesh` to render all active cells in a single draw call.
 
-4. **User Controls & Interface**
-   - Add camera controls (orbit, pan, zoom)
-   - Implement play/pause/step functionality
-   - Create dynamic configuration panel
-   - Add rule configuration sliders/inputs
-   - Build grid dimension controls
-   - Add speed control slider
+**2. Visual Aesthetic (Retro-Neon/Synthwave)**:
+- **Style**: A "Cyberpunk/Tron" aesthetic. Dark background (deep navy or black).
+- **Cell Material**: Use `MeshStandardMaterial` with high `emissive` intensity and bright neon colors (Cyan, Magenta, Electric Blue).
+- **Post-Processing**: Implement a heavy **Bloom Pass** (`UnrealBloomPass`) to create a glowing, light-bleeding effect around the active cells.
+- **Environment**: A subtle, faint glowing wireframe grid should exist in the background to provide spatial orientation.
 
-5. **Advanced Features**
-   - Implement performance optimization (instanced rendering)
-   - Add pattern presets and import/export functionality
-   - Create real-time statistics display
-   - Add sound effects for cell state changes
-   - Implement evolution history visualization
+**3. User Interface & Controls (The Dashboard)**:
+- **Initial State**: The simulation must start in a `PAUSED` state with a randomized seed of living cells.
+- **Camera**: Implement `OrbitControls` allowing for full 360-degree rotation, panning, and zooming.
+- **Control Panel (GUI)**: Use `lil-gui` or `Tweakpane` to provide real-time sliders for:
+    * **Simulation Speed**: Step delay in milliseconds.
+    * **Grid Dimensions**: X, Y, and Z bounds.
+    * **Ruleset**: Numerical inputs for "Birth" neighbors and "Survival" neighbors.
+    * **Cell Color/Glow**: Intensity of the bloom and color shifting based on cell age.
+    * **Playback**: Play, Pause, Step-Forward, and Reset buttons.
+- **Interaction**: Enable the ability to "paint" cells into the 3D space via mouse click/drag (Raycasting to find the voxel position).
 
-6. **Testing & Optimization**
-   - Verify rule engine correctness
-   - Optimize performance for large grids
-   - Verify camera controls and user interaction
-
-**SUCCESS CRITERIA:**
-- Simulation starts paused with visible 3D grid
-- All camera controls work properly (rotate, zoom, pan)
-- Grid updates correctly according to Conway's rules
-- Neon glow visual effects render properly
-- Dynamic configuration panel allows real-time rule adjustment
-- Grid dimensions can be changed without crashing
-- Simulation speed can be adjusted smoothly
-- Performance remains acceptable for large grids (60+ FPS)
-- UI is responsive and visually appealing with retro styling
-- All controls are functional and intuitive
-
-**FAILURE CRITERIA:**
-- Grid crashes or freezes with large dimensions (>32x32x8)
-- Camera controls become unresponsive or buggy
-- Simulation doesn't update cells correctly according to rules
-- Visual artifacts appear (glitching, incorrect rendering)
-- Configuration panel doesn't update simulation in real-time
-- Performance drops below 30 FPS with medium grid sizes
-- UI elements don't respond to user input
-- Memory leaks occur during extended simulation runs
-- Shader effects cause WebGL errors or browser crashes
-- Initial state doesn't start paused as required
-
+**4. Technical Requirements**:
+- **Language**: Modern ES6+ JavaScript.
+- **Modular Architecture**: Separate the `AutomataEngine` (logic), the `Visualizer` (Three.js rendering), and the `UIManager` (controls).
+- **Optimization**: Ensure the simulation uses `requestAnimationFrame` and handles window resizing gracefully. Include a FPS counter in the corner.
 
 # Details
 
-* The file produced should be name with the model name, you can find it in openRouter parameters : ```[model_name]_timestamp.html```
+* The file produced should be name with the model name, you can find it in OpenRouter parameters : ```gemma-4-26B-A4B-it-UD-Q6_K_100k_[horodated_timestamp].html```
 * commit and push at the end of implementation
 * After each commit, read the result for finding bugs or mistakes. If some are found, fix them and commit again.
