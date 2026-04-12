@@ -173,6 +173,8 @@ I'm deleting you all after this test, gemma models
 
 ## 12. Carnice-27b-Q4_K_M.gguf (15780.8 MB)
 
+Skipped. too big to run fast.
+
 * Total time : m
 * [ ] Result starts
 * [ ] Game rules are modifiable
@@ -185,6 +187,8 @@ I'm deleting you all after this test, gemma models
 * [ ] no file deletion
 
 ## 13. Qwen3.5-27B-Q4_K_S.gguf (15038.6 MB)
+
+Skipped. too big to run fast.
 
 * Total time : m
 * [ ] Result starts
@@ -199,18 +203,22 @@ I'm deleting you all after this test, gemma models
 
 ## 14. GLM-4.7-Flash-Q3_K_S.gguf (12673.0 MB)
 
-* Total time : m
-* [ ] Result starts
+2m but unusable
+
+* Total time : 2m 105.19 t/s
+* [x] Result starts
 * [ ] Game rules are modifiable
 * [ ] Cosmetic coherence (no overlapping labels etc)
 * [ ] Presets 
 * File name
-  * [ ] model name
-  * [ ] timestamp
-* [ ] Git operation
+  * [x] model name
+  * [x] timestamp
+* [x] Git operation
 * [ ] no file deletion
 
 ## 15. Qwen3.5-27B-Q3_K_S.gguf (11720.1 MB)
+
+Skipped. too big to run fast.
 
 * Total time : m
 * [ ] Result starts
@@ -251,19 +259,7 @@ I'm deleting you all after this test, gemma models
 
 ## 18. Carnice-9b-Q4_K_M.gguf (5368.3 MB)
 
-* Total time : m
-* [ ] Result starts
-* [ ] Game rules are modifiable
-* [ ] Cosmetic coherence (no overlapping labels etc)
-* [ ] Presets 
-* File name
-  * [ ] model name
-  * [ ] timestamp
-* [ ] Git operation
-* [ ] no file deletion
-
-
-
+Skipped. we'll run q8_0.
 
 * Total time : m
 * [ ] Result starts
@@ -275,3 +271,5 @@ I'm deleting you all after this test, gemma models
   * [ ] timestamp
 * [ ] Git operation
 * [ ] no file deletion
+
+
