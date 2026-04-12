@@ -158,6 +158,8 @@ very fast, good execution
 
 ## 11. gemma-4-26B-A4B-it-UD-Q4_K_M.gguf (16086.8 MB)
 
+I'm deleting you all after this test, gemma models
+
 * Total time : m
 * [ ] Result starts
 * [ ] Game rules are modifiable
