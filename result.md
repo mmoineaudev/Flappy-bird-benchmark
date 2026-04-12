@@ -20,16 +20,19 @@ dir is /home/neo/Documents/Flappy-bird-benchmark/GOL.md
 
 ## 2. GLM-4.7-Flash-Q6_K.gguf (23549.2 MB)
 
-* Total time : m
+UI is bad, overlaps presets and the panel is not wrapping all options. 
+
+* Total time : 5m, 42.38 t/s, 9m
 * [ ] Result starts
+	* [x] fixed second time
 * [ ] Game rules are modifiable
 * [ ] Cosmetic coherence (no overlapping labels etc)
-* [ ] Presets 
+* [x] Presets 
 * File name
-  * [ ] model name
-  * [ ] timestamp
-* [ ] Git operation
-* [ ] no file deletion
+  * [x] model name
+  * [x] timestamp
+* [x] Git operation
+* [x] no file deletion
 
 ## 3. /home/neo/Models/Qwen3-Coder-Next-REAP-40B-A3B.i1-Q4_K_S.gguf (22353.8 MB)
 
