@@ -85,6 +85,8 @@ Skipped. too big to run fast.
 
 ## 6. Carnice-27b-Q6_K.gguf (21059.5 MB)
 
+Skipped. too big to run fast.
+
 * Total time : m
 * [ ] Result starts
 * [ ] Game rules are modifiable
@@ -98,16 +100,20 @@ Skipped. too big to run fast.
 
 ## 7. /home/neo/Models/cerebras_Qwen3-Coder-REAP-25B-A3B-Q5_K_L.gguf (17078.9 MB)
 
-* Total time : m
-* [ ] Result starts
+> needed a "please proceed" after reading
+
+Bugged, there is no cell disappearing, they remain here
+
+* Total time : 4m 57.75 t/s
+* [x] Result starts
 * [ ] Game rules are modifiable
-* [ ] Cosmetic coherence (no overlapping labels etc)
-* [ ] Presets 
+* [x] Cosmetic coherence (no overlapping labels etc)
+* [x] Presets 
 * File name
   * [ ] model name
-  * [ ] timestamp
+  * [x] timestamp
 * [ ] Git operation
-* [ ] no file deletion
+* [x] no file deletion
 
 ## 8. GLM-4.7-Flash-UD-Q4_K_XL.gguf (16708.5 MB)
 
