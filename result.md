@@ -145,16 +145,16 @@ very fast, good execution
 
 ## 10. Qwen-3.5-28B-A3B-REAP-Q4_K_M.gguf (16464.8 MB)
 
-* Total time : m
-* [ ] Result starts
+* Total time : 5m
+* [x] Result starts
 * [ ] Game rules are modifiable
-* [ ] Cosmetic coherence (no overlapping labels etc)
-* [ ] Presets 
+* [x] Cosmetic coherence (no overlapping labels etc)
+* [x] Presets 
 * File name
   * [ ] model name
-  * [ ] timestamp
-* [ ] Git operation
-* [ ] no file deletion
+  * [x] timestamp
+* [x] Git operation
+* [x] no file deletion
 
 ## 11. gemma-4-26B-A4B-it-UD-Q4_K_M.gguf (16086.8 MB)
 
