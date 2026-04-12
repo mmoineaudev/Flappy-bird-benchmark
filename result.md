@@ -145,7 +145,7 @@ very fast, good execution
 
 ## 10. Qwen-3.5-28B-A3B-REAP-Q4_K_M.gguf (16464.8 MB)
 
-* Total time : 5m
+* Total time : 5m 89.40 t/s
 * [x] Result starts
 * [ ] Game rules are modifiable
 * [x] Cosmetic coherence (no overlapping labels etc)
