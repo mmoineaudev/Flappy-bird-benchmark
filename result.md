@@ -117,16 +117,18 @@ Bugged, there is no cell disappearing, they remain here
 
 ## 8. GLM-4.7-Flash-UD-Q4_K_XL.gguf (16708.5 MB)
 
-* Total time : m
-* [ ] Result starts
+very fast, good execution
+
+* Total time : 5m 74.58 t/s
+* [x] Result starts
 * [ ] Game rules are modifiable
-* [ ] Cosmetic coherence (no overlapping labels etc)
+* [x] Cosmetic coherence (no overlapping labels etc)
 * [ ] Presets 
 * File name
-  * [ ] model name
-  * [ ] timestamp
-* [ ] Git operation
-* [ ] no file deletion
+  * [x] model name
+  * [x] timestamp
+* [x] Git operation
+* [x] no file deletion
 
 ## 9. gemma-4-31B-it-Q4_K_S.gguf (16593.8 MB)
 
