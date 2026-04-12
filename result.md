@@ -5,16 +5,18 @@ dir is /home/neo/Documents/Flappy-bird-benchmark/GOL.md
 
 ## 1. Qwen3.5-35B-A3B-Q6_K.gguf (27193.2 MB)
 
-* Total time : m
-* [ ] Result starts
+> needed a "please proceed" after reading
+
+* Total time : 9m , 51.54 t/s
+* [x] Result starts
 * [ ] Game rules are modifiable
-* [ ] Cosmetic coherence (no overlapping labels etc)
-* [ ] Presets 
+* [x] Cosmetic coherence (no overlapping labels etc)
+* [x] Presets 
 * File name
-  * [ ] model name
-  * [ ] timestamp
-* [ ] Git operation
-* [ ] no file deletion
+  * [x] model name in commit
+  * [x] timestamp
+* [x] Git operation
+* [x] no file deletion
 
 ## 2. GLM-4.7-Flash-Q6_K.gguf (23549.2 MB)
 
