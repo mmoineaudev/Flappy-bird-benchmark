@@ -250,7 +250,7 @@ failed
 
 Surprisingly good, lots of tool use, more token but first tried a launchable game, with a index bug 
 
-* Total time : 6m
+* Total time : 6m 62.66 t/s
 * [x] Result starts
 * [ ] Game rules are modifiable
 * [ ] Cosmetic coherence (no overlapping labels etc)
