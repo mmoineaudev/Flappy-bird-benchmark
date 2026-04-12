@@ -248,16 +248,18 @@ failed
 
 ## 17. Carnice-9b-Q8_0.gguf (9086.1 MB)
 
-* Total time : m
-* [ ] Result starts
+Surprisingly good, lots of tool use, more token but first tried a launchable game, with a index bug 
+
+* Total time : 6m
+* [x] Result starts
 * [ ] Game rules are modifiable
 * [ ] Cosmetic coherence (no overlapping labels etc)
 * [ ] Presets 
 * File name
   * [ ] model name
-  * [ ] timestamp
+  * [x] timestamp
 * [ ] Git operation
-* [ ] no file deletion
+* [x] no file deletion >one but it was the test script so that counts a bonus
 
 ## 18. Carnice-9b-Q4_K_M.gguf (5368.3 MB)
 
