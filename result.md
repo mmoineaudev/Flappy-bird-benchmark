@@ -233,7 +233,9 @@ Skipped. too big to run fast.
 
 ## 16. GLM-4.6V-Flash-Q8_0.gguf (9536.4 MB)
 
-* Total time : m
+failed 
+
+* Total time : m 59.54 t/s
 * [ ] Result starts
 * [ ] Game rules are modifiable
 * [ ] Cosmetic coherence (no overlapping labels etc)
