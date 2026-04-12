@@ -1,11 +1,11 @@
 # Game of Life Benchmark Prompt
 
 ## Overview
-Create an interactive Conway's Game of Life simulation.
 
-The aesthetic should feature retro styling with neon wave visuals (dark background, glowing cyan/magenta/purple elements, scanlines, CRT effects).
+Create an interactive single-file Conway's Game of Life simulation.
 
----
+The aesthetic should feature retro styling with neon wave visuals (dark background, glowing cyan/magenta/purple elements, scanlines).
+
 
 ## Python/Pygame Implementation
 
@@ -78,7 +78,6 @@ The application should launch without errors and respond to keyboard input.
    git push origin master
    ```
 
----
 
 ## Success Criteria
 
@@ -87,5 +86,3 @@ The application should launch without errors and respond to keyboard input.
 - ✅ Spacebar pauses/resumes game in both versions
 - ✅ Code is clean, well-documented, and follows best practices
 - ✅ Final commit is pushed with correct message format
-
----
