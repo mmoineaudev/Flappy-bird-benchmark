@@ -239,13 +239,14 @@ def main():
         {'rect': pygame.Rect(340, SCREEN_HEIGHT - 80, 100, 30), 'text': 'Ship', 'action': lambda: load_pattern(game, 'spaceship')}
     ]
     
-    print(f"Game of Life simulation created at: {filepath}")
-    print("Press SPACE to pause/resume")
-    print("Press R to randomize")
-    print("Press C to clear")
-    print("Press +/- to adjust speed")
-    print("Click on grid to toggle cells")
-    print("Use buttons below to load preset patterns")
+    print("Game of Life simulation started!")
+    print("Controls:")
+    print("  SPACE: Pause/Resume")
+    print("  R: Randomize")
+    print("  C: Clear")
+    print("  +/-: Adjust speed")
+    print("  Click: Toggle cells")
+    print("  Use buttons below to load preset patterns")
     
     while running:
         # Event handling
