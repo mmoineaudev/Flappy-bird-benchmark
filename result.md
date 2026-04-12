@@ -51,6 +51,12 @@ UI is bad, overlaps presets and the panel is not wrapping all options.
 
 ## 4. gemma-4-26B-A4B-it-UD-Q6_K.gguf (21842.6 MB)
 
+3 prompt for first attempt, the thing just does not want to work. AGI.
+
+recommended parameters are super bad, 0.7 or 0.6 temperature and it starts...
+
+Ok even when it starts working it does it bad : this is a chatbot. 
+
 * Total time : m , 45.09 t/s
 * [ ] Result starts
 * [ ] Game rules are modifiable
@@ -63,6 +69,8 @@ UI is bad, overlaps presets and the panel is not wrapping all options.
 * [ ] no file deletion
 
 ## 5. Qwen3.5-27B-Q6_K.gguf (21413.7 MB)
+
+Skipped. too big to run fast.
 
 * Total time : m
 * [ ] Result starts
