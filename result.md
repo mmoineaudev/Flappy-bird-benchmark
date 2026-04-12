@@ -36,20 +36,22 @@ UI is bad, overlaps presets and the panel is not wrapping all options.
 
 ## 3. /home/neo/Models/Qwen3-Coder-Next-REAP-40B-A3B.i1-Q4_K_S.gguf (22353.8 MB)
 
-* Total time : m
-* [ ] Result starts
+> needed a "please proceed" after reading
+
+* Total time : 7m, 53.38 t/s
+* [x] Result starts
 * [ ] Game rules are modifiable
-* [ ] Cosmetic coherence (no overlapping labels etc)
-* [ ] Presets 
+* [x] Cosmetic coherence (no overlapping labels etc)
+* [x] Presets 
 * File name
   * [ ] model name
-  * [ ] timestamp
-* [ ] Git operation
-* [ ] no file deletion
+  * [x] timestamp
+* [x] Git operation
+* [x] no file deletion
 
 ## 4. gemma-4-26B-A4B-it-UD-Q6_K.gguf (21842.6 MB)
 
-* Total time : m
+* Total time : m , 45.09 t/s
 * [ ] Result starts
 * [ ] Game rules are modifiable
 * [ ] Cosmetic coherence (no overlapping labels etc)
