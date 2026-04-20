@@ -52,6 +52,9 @@ CELL_SIZE   = 15
 GRID_COLS   = 64   # (SCREEN_W - 2*MARGIN) // CELL_SIZE — fits comfortably
 GRID_ROWS   = 46   # (screen_h - top - bottom - 2*margin) // CELL_SIZE
 
+# Screen height: exactly fits grid area with bars and margins
+SCREEN_H = TOP_BAR_H + GRID_ROWS * CELL_SIZE + BOTTOM_BAR_H + 2 * MARGIN  # 826
+
 # Game speed
 MIN_SPEED = 1    # generations per second
 MAX_SPEED = 60
