@@ -314,6 +314,12 @@ This checklist is derived from the use case specifications and is designed to gu
   - [x] Default map seeds on first launch via ensureDefaultMapExists()
   - [x] QUICK PLAY button provides instant access to default map
 
+- [x] **Fix null-ball crash on game start** (integration bug)
+  - [x] checkPaddleBallCollisions() now guards against empty balls array
+  - [x] checkBallPaddleCollision() has defensive null checks for ball.radius
+  - [x] EDITOR PLAY MAP now sets useCustomGrid BEFORE transitionTo (timing fix)
+  - [x] Ball spawn delay (1.5s) no longer causes game loop to crash
+
 ---
 
 ## Implementation Notes
