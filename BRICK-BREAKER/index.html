@@ -1,0 +1,2132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RogueBreaker</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { background: #0a0a1a; color: #e0e0e0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; overflow: hidden; width: 100vw; height: 100vh; }
+#gameCanvas { display: block; position: absolute; top: 0; left: 0; z-index: 1; }
+
+/* HUD */
+#hud { position: absolute; top: 0; left: 0; right: 0; z-index: 10; display: none; padding: 10px 20px; background: rgba(0,0,0,0.6); display: none; justify-content: space-between; align-items: center; font-size: 16px; }
+#hud.visible { display: flex; }
+.hud-item { display: flex; align-items: center; gap: 6px; }
+.hud-label { color: #888; font-size: 13px; text-transform: uppercase; }
+.hud-value { color: #fff; font-weight: bold; font-size: 18px; }
+#modifierIcons { display: flex; gap: 4px; }
+.modifier-icon { background: rgba(100,100,255,0.3); border: 1px solid #55f; border-radius: 4px; padding: 2px 8px; font-size: 12px; color: #aaf; }
+
+/* Overlays */
+.overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 20; display: none; justify-content: center; align-items: center; flex-direction: column; background: rgba(5,5,20,0.92); }
+.overlay.active { display: flex; }
+.overlay h1 { font-size: 48px; margin-bottom: 10px; color: #fff; text-shadow: 0 0 20px rgba(100,100,255,0.5); }
+.overlay h2 { font-size: 28px; margin-bottom: 20px; color: #ccc; }
+.overlay p { font-size: 16px; color: #aaa; margin-bottom: 8px; }
+.overlay .subtitle { font-size: 18px; color: #88f; margin-bottom: 30px; }
+
+/* Buttons */
+.btn { background: linear-gradient(135deg, #334, #556); border: 1px solid #668; color: #ddd; padding: 12px 32px; font-size: 18px; border-radius: 8px; cursor: pointer; margin: 6px; transition: all 0.2s; min-width: 200px; }
+.btn:hover { background: linear-gradient(135deg, #446, #779); color: #fff; border-color: #88f; transform: scale(1.05); }
+.btn:active { transform: scale(0.98); }
+.btn.primary { background: linear-gradient(135deg, #224, #44a); border-color: #66f; }
+.btn.primary:hover { background: linear-gradient(135deg, #336, #55c); }
+.btn.danger { background: linear-gradient(135deg, #422, #a44); border-color: #f66; }
+
+/* Menu */
+#menuOverlay h1 { font-size: 64px; background: linear-gradient(90deg, #44f, #a4f); -webkit-background-clip: text; -webkit-text-fill-color: transparent; margin-bottom: 5px; }
+#menuOverlay .tagline { font-size: 18px; color: #668; margin-bottom: 40px; }
+#menuButtons { display: flex; flex-direction: column; gap: 8px; align-items: center; }
+
+/* Modifier Cards */
+.modifier-cards { display: flex; gap: 16px; margin: 20px 0; flex-wrap: wrap; justify-content: center; }
+.modifier-card { background: rgba(30,30,60,0.8); border: 2px solid #446; border-radius: 12px; padding: 20px; width: 220px; cursor: pointer; transition: all 0.2s; text-align: center; }
+.modifier-card:hover { border-color: #66f; transform: translateY(-4px); box-shadow: 0 8px 20px rgba(100,100,255,0.3); }
+.modifier-card .card-key { font-size: 12px; color: #668; margin-bottom: 8px; }
+.modifier-card .card-name { font-size: 18px; font-weight: bold; color: #fff; margin-bottom: 6px; }
+.modifier-card .card-desc { font-size: 13px; color: #aaa; margin-bottom: 8px; }
+.modifier-card .card-stack { font-size: 11px; color: #f80; }
+.modifier-card .card-conflict { font-size: 11px; color: #f44; margin-top: 4px; }
+
+/* Game Over Stats */
+.stats-table { background: rgba(20,20,40,0.8); border-radius: 8px; padding: 20px 40px; margin: 15px 0; min-width: 300px; }
+.stats-row { display: flex; justify-content: space-between; padding: 4px 0; border-bottom: 1px solid #222; }
+.stats-row:last-child { border-bottom: none; }
+.stats-label { color: #888; }
+.stats-value { color: #fff; font-weight: bold; }
+
+/* Editor */
+#editorOverlay { background: rgba(5,5,20,0.95); }
+#editorOverlay h2 { color: #88f; }
+.editor-container { display: flex; gap: 20px; align-items: flex-start; margin: 10px 0; }
+#editorGrid { display: grid; gap: 1px; background: #222; border: 2px solid #446; padding: 1px; }
+.editor-cell { width: 36px; height: 36px; background: #111; border: 1px solid #333; cursor: pointer; transition: background 0.1s; display: flex; align-items: center; justify-content: center; font-size: 10px; color: #555; }
+.editor-cell:hover { border-color: #66f; }
+.editor-cell.t-normal { background: #555; }
+.editor-cell.t-hard { background: #333; border-color: #666; }
+.editor-cell.t-fragile { background: #886644; }
+.editor-cell.t-explosive { background: #aa3333; }
+.editor-cell.t-shooter { background: #336633; }
+.editor-cell.t-portal { background: #3333aa; }
+.editor-cell.t-bonus { background: #aa8833; }
+.editor-cell.t-spawner { background: #663366; }
+.editor-cell.t-wall { background: #446666; }
+.editor-cell.t-ballstart { background: #cccc66; }
+
+#toolPalette { display: flex; flex-direction: column; gap: 4px; }
+.tool-btn { background: #222; border: 1px solid #444; color: #aaa; padding: 8px 12px; cursor: pointer; border-radius: 4px; font-size: 13px; text-align: left; }
+.tool-btn:hover { background: #333; color: #fff; }
+.tool-btn.active { background: #224; border-color: #66f; color: #fff; }
+.tool-section { border-top: 1px solid #333; padding-top: 8px; margin-top: 8px; }
+.tool-section label { font-size: 12px; color: #668; display: block; margin-bottom: 4px; }
+.tool-input { background: #111; border: 1px solid #444; color: #ddd; padding: 6px; border-radius: 4px; width: 100%; font-size: 13px; }
+
+#editorCanvas { margin-top: 10px; }
+
+/* Map Load List */
+.map-list { max-height: 300px; overflow-y: auto; width: 400px; }
+.map-item { background: rgba(30,30,60,0.8); border: 1px solid #446; border-radius: 6px; padding: 12px 16px; margin: 4px 0; cursor: pointer; display: flex; justify-content: space-between; align-items: center; }
+.map-item:hover { border-color: #66f; }
+.map-item .map-name { font-weight: bold; color: #fff; }
+.map-item .map-meta { font-size: 12px; color: #888; }
+.map-item .map-actions { display: flex; gap: 4px; }
+.map-item .map-actions button { padding: 4px 10px; font-size: 12px; }
+
+/* Notification */
+#notification { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); z-index: 100; background: rgba(0,0,0,0.85); border: 1px solid #66f; border-radius: 8px; padding: 10px 24px; color: #fff; font-size: 14px; display: none; }
+#notification.visible { display: block; }
+#notification.error { border-color: #f44; }
+#notification.success { border-color: #4a4; }
+
+/* Combo display */
+#comboDisplay { position: absolute; z-index: 15; font-size: 32px; font-weight: bold; color: #ff0; text-shadow: 0 0 10px rgba(255,255,0,0.5); pointer-events: none; display: none; }
+</style>
+</head>
+<body>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hud-item"><span class="hud-label">Score</span><span class="hud-value" id="hudScore">0</span></div>
+  <div class="hud-item"><span class="hud-label">Lives</span><span class="hud-value" id="hudLives">3</span></div>
+  <div class="hud-item"><span class="hud-label">Level</span><span class="hud-value" id="hudLevel">1</span></div>
+  <div class="hud-item"><span class="hud-label">Combo</span><span class="hud-value" id="hudCombo">x1</span></div>
+  <div class="hud-item"><span class="hud-label">Mods</span><span id="modifierIcons"></span></div>
+</div>
+
+<!-- Combo Display -->
+<div id="comboDisplay"></div>
+
+<!-- Notification -->
+<div id="notification"></div>
+
+<!-- Main Menu -->
+<div id="menuOverlay" class="overlay active">
+  <h1>RogueBreaker</h1>
+  <p class="tagline">A Roguelike Brick Breaker</p>
+  <div id="menuButtons">
+    <button class="btn primary" id="btnPlay">Play</button>
+    <button class="btn" id="btnEditor">Map Editor</button>
+    <button class="btn" id="btnLoadMap">Load Map</button>
+  </div>
+</div>
+
+<!-- Modifier Selection -->
+<div id="modifierOverlay" class="overlay">
+  <h2>Level Complete!</h2>
+  <p class="subtitle">Choose a modifier</p>
+  <div class="modifier-cards" id="modifierCards"></div>
+  <button class="btn" id="btnDecline">Skip (No Modifier)</button>
+</div>
+
+<!-- Game Over -->
+<div id="gameOverOverlay" class="overlay">
+  <h1>Game Over</h1>
+  <div class="stats-table" id="gameOverStats"></div>
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <button class="btn primary" id="btnRetry">Retry Run</button>
+    <button class="btn" id="btnMenuFromGO">Main Menu</button>
+  </div>
+</div>
+
+<!-- Victory -->
+<div id="victoryOverlay" class="overlay">
+  <h1 style="background:linear-gradient(90deg,#ff0,#f80);-webkit-background-clip:text;-webkit-text-fill-color:transparent;">Victory!</h1>
+  <p class="subtitle">You conquered all levels!</p>
+  <div class="stats-table" id="victoryStats"></div>
+  <div style="display:flex;gap:8px;margin-top:10px;">
+    <button class="btn primary" id="btnPlayAgain">Play Again</button>
+    <button class="btn" id="btnMenuFromVictory">Main Menu</button>
+  </div>
+</div>
+
+<!-- Level Complete -->
+<div id="levelCompleteOverlay" class="overlay">
+  <h2>Level Complete!</h2>
+  <div class="stats-table" id="levelCompleteStats"></div>
+</div>
+
+<!-- Map Editor -->
+<div id="editorOverlay" class="overlay">
+  <h2>Map Editor</h2>
+  <div class="editor-container">
+    <div id="editorGrid"></div>
+    <div id="toolPalette">
+      <div class="tool-section">
+        <label>Tools</label>
+        <button class="tool-btn active" data-tool="brush">Brush</button>
+        <button class="tool-btn" data-tool="fill">Fill</button>
+        <button class="tool-btn" data-tool="eraser">Eraser</button>
+      </div>
+      <div class="tool-section">
+        <label>Tile Type</label>
+        <button class="tool-btn active" data-tile="normal">Normal (1HP)</button>
+        <button class="tool-btn" data-tile="hard">Hard (3HP)</button>
+        <button class="tool-btn" data-tile="fragile">Fragile</button>
+        <button class="tool-btn" data-tile="explosive">Explosive</button>
+        <button class="tool-btn" data-tile="shooter">Shooter</button>
+        <button class="tool-btn" data-tile="portal">Portal</button>
+        <button class="tool-btn" data-tile="bonus">Bonus</button>
+        <button class="tool-btn" data-tile="spawner">Spawner</button>
+        <button class="tool-btn" data-tile="wall">Barrier Wall</button>
+        <button class="tool-btn" data-tile="ballstart">Ball Start</button>
+      </div>
+      <div class="tool-section">
+        <label>Patterns</label>
+        <button class="tool-btn" data-pattern="pyramid">Pyramid</button>
+        <button class="tool-btn" data-pattern="checkerboard">Checkerboard</button>
+        <button class="tool-btn" data-pattern="spiral">Spiral</button>
+        <button class="tool-btn" data-pattern="random">Random</button>
+      </div>
+      <div class="tool-section">
+        <label>Grid Size</label>
+        <select class="tool-input" id="editorGridSize">
+          <option value="8x6">8 x 6</option>
+          <option value="10x8" selected>10 x 8</option>
+          <option value="12x8">12 x 8</option>
+          <option value="14x10">14 x 10</option>
+          <option value="16x12">16 x 12</option>
+        </select>
+      </div>
+      <div class="tool-section">
+        <label>Map Name</label>
+        <input class="tool-input" id="editorMapName" placeholder="My Custom Map" value="">
+      </div>
+      <div class="tool-section">
+        <label>Difficulty</label>
+        <select class="tool-input" id="editorDifficulty">
+          <option value="easy">Easy</option>
+          <option value="normal" selected>Normal</option>
+          <option value="hard">Hard</option>
+        </select>
+      </div>
+      <div class="tool-section" style="margin-top:12px;">
+        <button class="btn primary" id="btnPlayEditor" style="width:100%;min-width:auto;padding:8px 16px;font-size:14px;">Play This Map</button>
+        <button class="btn" id="btnSaveMap" style="width:100%;min-width:auto;padding:8px 16px;font-size:14px;">Save Map</button>
+        <button class="btn" id="btnValidateMap" style="width:100%;min-width:auto;padding:8px 16px;font-size:14px;">Validate</button>
+        <button class="btn" id="btnBackToMenu" style="width:100%;min-width:auto;padding:8px 16px;font-size:14px;">Back to Menu</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Load Map Overlay -->
+<div id="loadMapOverlay" class="overlay">
+  <h2>Load Saved Map</h2>
+  <div class="map-list" id="mapList"></div>
+  <button class="btn" id="btnBackFromLoad" style="margin-top:15px;">Back to Menu</button>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+<script>
+(function() {
+'use strict';
+
+// ============================================================
+// CONFIG CONSTANTS
+// ============================================================
+const CONFIG = Object.freeze({
+  CANVAS_WIDTH: window.innerWidth,
+  CANVAS_HEIGHT: window.innerHeight,
+  FPS: 60,
+  ARENA: { left: -8, right: 8, top: 8, bottom: -5.5, paddleY: -4.8 },
+  PADDLE: { width: 2.0, height: 0.2, depth: 0.5, speed: 8 },
+  BALL: { radius: 0.15, speed: 5.0, maxSpeed: 10.0 },
+  BRICK: { width: 1.6, height: 0.4, depth: 0.5, rows: 5, cols: 8, padding: 0.1, startY: 5.0, bottomY: 2.0 },
+  DEFAULT_LIVES: { easy: 5, normal: 3, hard: 1 },
+  MAX_LEVELS: 99,
+  CUSTOM_LEVEL: 99,
+  MAX_SPAWNERS_PER_MAP: 5,
+  MAX_MAPS: 50,
+  COMBO_WINDOW: 1.5,
+  DEFLECTION_ANGLE: Math.PI / 3,
+  AOE_RADIUS: 2.5,
+  AOE_RECURSION_LIMIT: 3,
+  BALL_START_DELAY: 1500,
+  SHOOTER_INTERVAL: 3.0,
+  UPWARD_FIRE_INTERVAL: 1.5,
+  MODIFIER_STACK_CAPS: {
+    bounce_boost: 4,
+    widen: 5,
+    split: 1,
+    magnet: 1,
+    shield: 1,
+    timeshift: 1,
+    color_sync: 1,
+    autoaim: 1,
+    multiball: 1,
+    projectile: 1
+  },
+  BRICK_POINTS: { normal: 10, hard: 30, fragile: 15, explosive: 20, shooter: 25, portal: 15, bonus: 20 },
+  BRICK_COLORS: {
+    normal: 0x6688aa,
+    hard: 0x445566,
+    fragile: 0xaa8844,
+    explosive: 0xaa3333,
+    shooter: 0x336633,
+    portal: 0x3333aa,
+    bonus: 0xaa8833,
+    spawner: 0x663366,
+    wall: 0x446666
+  },
+  TILE_TYPES: ['normal','hard','fragile','explosive','shooter','portal','bonus','spawner','wall','ballstart'],
+  VALID_TILE_TYPES: new Set(['normal','hard','fragile','explosive','shooter','portal','bonus','spawner','wall','ballstart','empty']),
+  MODIFIER_DEFS: {
+    split:          { name: 'Dual Paddle',        desc: 'Creates a second paddle controlled by J/L',              effectType: 'split',          conflictsWith: ['multiball'] },
+    widen:          { name: 'Broad Sweep',        desc: '+40% paddle width per stack',                          effectType: 'widen',          conflictsWith: ['split'] },
+    projectile:     { name: 'Upward Fire',        desc: 'Auto-fire projectiles upward with Space',              effectType: 'projectile',     conflictsWith: [] },
+    magnet:         { name: 'Ball Pull',          desc: 'Trajectory curves toward paddle when close',           effectType: 'magnet',         conflictsWith: [] },
+    bounce_boost:   { name: 'Elasticity',         desc: '+15% ball velocity per stack on bounce',               effectType: 'bounce_boost',   conflictsWith: [] },
+    shield:         { name: 'Barrier Wall',       desc: 'Temporary wall above paddle that blocks ball loss once', effectType: 'shield',         conflictsWith: [] },
+    multiball:      { name: 'Clone Strike',       desc: 'Destroying special bricks spawns 2 clone balls',        effectType: 'multiball',      conflictsWith: ['split'] },
+    timeshift:      { name: 'Slow/Speed Toggle',  desc: 'Press T to toggle time scale 0.5x-1.5x',               effectType: 'timeshift',      conflictsWith: [] },
+    color_sync:     { name: 'Chromatic Damage',   desc: '+200% damage when paddle color matches brick color',   effectType: 'color_sync',     conflictsWith: [] },
+    autoaim:        { name: 'Assist Guide',       desc: 'Paddle subtly drifts toward ball trajectory',           effectType: 'autoaim',        conflictsWith: [] }
+  },
+  STORAGE_KEY: 'roguebreaker_maps'
+});
+
+// ============================================================
+// THREE.JS SCENE SETUP
+// ============================================================
+let scene, camera, renderer;
+let sceneReady = false;
+
+function initThreeJS() {
+  const canvas = document.getElementById('gameCanvas');
+  try {
+    renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: false });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.setClearColor(0x0a0a1a);
+
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(50, window.innerWidth / window.innerHeight, 0.1, 100);
+    camera.position.set(0, 0, 14);
+    camera.lookAt(0, 1, 0);
+
+    // Lighting
+    const ambient = new THREE.AmbientLight(0x404060, 0.6);
+    scene.add(ambient);
+    const dirLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    dirLight.position.set(0, 5, 5);
+    scene.add(dirLight);
+    const pointLight = new THREE.PointLight(0x4444ff, 0.4, 20);
+    pointLight.position.set(0, 3, 6);
+    scene.add(pointLight);
+
+    // Arena boundary walls (visual)
+    createArenaBoundaries();
+
+    sceneReady = true;
+    return true;
+  } catch(e) {
+    console.error('Three.js init failed:', e);
+    showNotification('WebGL not supported or CDN unavailable.', true);
+    return false;
+  }
+}
+
+function createArenaBoundaries() {
+  const wallMat = new THREE.MeshBasicMaterial({ color: 0x222244, transparent: true, opacity: 0.3 });
+  const a = CONFIG.ARENA;
+  // Left wall
+  const lw = new THREE.Mesh(new THREE.BoxGeometry(0.05, a.top - a.bottom, 0.05), wallMat);
+  lw.position.set(a.left, (a.top + a.bottom) / 2, 0);
+  scene.add(lw);
+  // Right wall
+  const rw = new THREE.Mesh(new THREE.BoxGeometry(0.05, a.top - a.bottom, 0.05), wallMat);
+  rw.position.set(a.right, (a.top + a.bottom) / 2, 0);
+  scene.add(rw);
+  // Top wall
+  const tw = new THREE.Mesh(new THREE.BoxGeometry(a.right - a.left, 0.05, 0.05), wallMat);
+  tw.position.set(0, a.top, 0);
+  scene.add(tw);
+  // Bottom (invisible, for ball loss detection)
+}
+
+function clearScene() {
+  // Remove all objects except arena boundaries and lights
+  const toRemove = [];
+  scene.traverse(function(obj) {
+    if (obj.isMesh || obj.isLine || obj.isPoints) {
+      toRemove.push(obj);
+    }
+  });
+  toRemove.forEach(function(obj) {
+    scene.remove(obj);
+    if (obj.geometry) obj.geometry.dispose();
+    if (obj.material) {
+      if (Array.isArray(obj.material)) obj.material.forEach(function(m){ m.dispose(); });
+      else obj.material.dispose();
+    }
+  });
+  // Clear groups
+  if (bricksGroup) { scene.remove(bricksGroup); bricksGroup = null; }
+  if (paddleGroup) { scene.remove(paddleGroup); paddleGroup = null; }
+  if (projectilesGroup) { scene.remove(projectilesGroup); projectilesGroup = null; }
+  if (bonusItemsGroup) { scene.remove(bonusItemsGroup); bonusItemsGroup = null; }
+  if (portalGroup) { scene.remove(portalGroup); portalGroup = null; }
+  if (shieldMesh) { scene.remove(shieldMesh); shieldMesh = null; }
+}
+
+// ============================================================
+// GAME STATE
+// ============================================================
+const GameState = {
+  MENU: 'MENU',
+  PLAYING: 'PLAYING',
+  LEVEL_COMPLETE: 'LEVEL_COMPLETE',
+  GAME_OVER: 'GAME_OVER',
+  VICTORY: 'VICTORY',
+  EDITOR: 'EDITOR'
+};
+
+let currentState = GameState.MENU;
+let nextTargetState = null;
+
+// Game data
+let gameStateData = {
+  score: 0,
+  lives: 3,
+  level: 1,
+  difficulty: 'normal',
+  modifiers: [],
+  combo: 0,
+  comboTimer: 0,
+  highestCombo: 0,
+  runStartTime: 0,
+  levelsCompleted: 0,
+  modifierHistory: [],
+  useCustomGrid: false,
+  customGrid: null,
+  customSpawners: null
+};
+
+// Run history
+let runHistory = [];
+
+// ============================================================
+// THREE.JS OBJECTS
+// ============================================================
+let bricksGroup, paddleGroup, projectilesGroup, bonusItemsGroup, portalGroup, shieldMesh;
+let paddle, balls = [], projectiles = [], bonusItems = [];
+let portals = [];
+let brickData = []; // {mesh, type, hp, maxHp, gridPos}
+let ballWasLaunched = false;
+let timeScale = 1.0;
+let upwardFireTimer = 0;
+let shooterTimers = {};
+
+// ============================================================
+// INPUT
+// ============================================================
+let keys = {};
+let editorState = {
+  gridWidth: 10,
+  gridHeight: 8,
+  grid: [],
+  currentTool: 'brush',
+  currentTile: 'normal',
+  currentPattern: 'pyramid',
+  isMouseDown: false,
+  selectedMapId: null
+};
+
+function setupInput() {
+  window.addEventListener('keydown', function(e) {
+    keys[e.code] = true;
+    // Modifier selection
+    if (currentState === GameState.LEVEL_COMPLETE) {
+      if (e.code === 'Digit1') selectModifier(0);
+      else if (e.code === 'Digit2') selectModifier(1);
+      else if (e.code === 'Digit3') selectModifier(2);
+      else if (e.code === 'Digit0' || e.code === 'Numpad0') declineModifier();
+    }
+    // Timeshift toggle
+    if (e.code === 'KeyT' && hasModifier('timeshift') && currentState === GameState.PLAYING) {
+      toggleTimeScale();
+    }
+    // Upward fire
+    if (e.code === 'Space' && hasModifier('projectile') && currentState === GameState.PLAYING) {
+      fireProjectileFromPaddle();
+    }
+  });
+  window.addEventListener('keyup', function(e) { keys[e.code] = false; });
+}
+
+// ============================================================
+// STATE MACHINE
+// ============================================================
+const StateTransitions = {
+  MENU:        ['PLAYING', 'EDITOR'],
+  PLAYING:     ['LEVEL_COMPLETE', 'GAME_OVER', 'MENU'],
+  LEVEL_COMPLETE: ['PLAYING', 'MENU'],
+  GAME_OVER:   ['PLAYING', 'MENU'],
+  VICTORY:     ['PLAYING', 'MENU'],
+  EDITOR:      ['PLAYING', 'MENU']
+};
+
+function transitionTo(newState) {
+  if (newState === currentState) return;
+  const allowed = StateTransitions[currentState];
+  if (!allowed || allowed.indexOf(newState) === -1) {
+    console.warn('Invalid transition:', currentState, '->', newState);
+    return;
+  }
+  console.log('Transition:', currentState, '->', newState);
+  exitCurrentState();
+  currentState = newState;
+  entryForState(newState);
+  notifySubsystems(newState);
+}
+
+function exitCurrentState() {
+  switch(currentState) {
+    case GameState.PLAYING:
+      cleanupPlaying();
+      break;
+    case GameState.LEVEL_COMPLETE:
+      document.getElementById('modifierOverlay').classList.remove('active');
+      break;
+    case GameState.GAME_OVER:
+      document.getElementById('gameOverOverlay').classList.remove('active');
+      break;
+    case GameState.VICTORY:
+      document.getElementById('victoryOverlay').classList.remove('active');
+      break;
+    case GameState.EDITOR:
+      cleanupEditor();
+      break;
+  }
+}
+
+function entryForState(state) {
+  switch(state) {
+    case GameState.PLAYING:
+      showPlaying();
+      break;
+    case GameState.LEVEL_COMPLETE:
+      showModifierSelection();
+      break;
+    case GameState.GAME_OVER:
+      showGameOver();
+      break;
+    case GameState.VICTORY:
+      showVictory();
+      break;
+    case GameState.EDITOR:
+      showEditor();
+      break;
+    case GameState.MENU:
+      showMenu();
+      break;
+  }
+}
+
+function notifySubsystems(newState) {
+  // Subsystems can register handlers here if needed
+  console.log('State changed to:', newState);
+}
+
+function cleanupPlaying() {
+  // Stop timers
+  upwardFireTimer = 0;
+  shooterTimers = {};
+  // Remove ball launch timer
+  if (ballLaunchTimer) { clearTimeout(ballLaunchTimer); ballLaunchTimer = null; }
+  // Clear launched flag
+  ballWasLaunched = false;
+  // Remove shield
+  if (shieldMesh) { scene.remove(shieldMesh); shieldMesh = null; }
+}
+
+function showPlaying() {
+  document.getElementById('menuOverlay').classList.remove('active');
+  document.getElementById('modifierOverlay').classList.remove('active');
+  document.getElementById('gameOverOverlay').classList.remove('active');
+  document.getElementById('victoryOverlay').classList.remove('active');
+  document.getElementById('editorOverlay').classList.remove('active');
+  document.getElementById('loadMapOverlay').classList.remove('active');
+  document.getElementById('hud').classList.add('visible');
+  document.getElementById('comboDisplay').style.display = 'none';
+  clearScene();
+  buildLevel();
+  updateHUD();
+  // Spawn ball after delay
+  ballLaunchTimer = setTimeout(function() {
+    if (currentState === GameState.PLAYING) spawnBall();
+  }, CONFIG.BALL_START_DELAY);
+}
+
+// ============================================================
+// MAIN MENU
+// ============================================================
+function showMenu() {
+  document.getElementById('menuOverlay').classList.add('active');
+  document.getElementById('hud').classList.remove('visible');
+  document.getElementById('gameOverOverlay').classList.remove('active');
+  document.getElementById('victoryOverlay').classList.remove('active');
+  clearScene();
+}
+
+// ============================================================
+// GAME INITIALIZATION
+// ============================================================
+function startNewGame() {
+  gameStateData.score = 0;
+  gameStateData.lives = CONFIG.DEFAULT_LIVES[gameStateData.difficulty] || CONFIG.DEFAULT_LIVES.normal;
+  gameStateData.level = 1;
+  gameStateData.modifiers = [];
+  gameStateData.combo = 0;
+  gameStateData.comboTimer = 0;
+  gameStateData.highestCombo = 0;
+  gameStateData.runStartTime = Date.now();
+  gameStateData.levelsCompleted = 0;
+  gameStateData.modifierHistory = [];
+  gameStateData.useCustomGrid = false;
+  gameStateData.customGrid = null;
+  gameStateData.customSpawners = null;
+  runHistory = [];
+  transitionTo(GameState.PLAYING);
+}
+
+// ============================================================
+// LEVEL SYSTEM
+// ============================================================
+function buildLevel() {
+  clearScene();
+  bricksGroup = new THREE.Group();
+  scene.add(bricksGroup);
+  paddleGroup = new THREE.Group();
+  scene.add(paddleGroup);
+  projectilesGroup = new THREE.Group();
+  scene.add(projectilesGroup);
+  bonusItemsGroup = new THREE.Group();
+  scene.add(bonusItemsGroup);
+  portalGroup = new THREE.Group();
+  scene.add(portalGroup);
+  balls = [];
+  projectiles = [];
+  bonusItems = [];
+  portals = [];
+  brickData = [];
+  shieldMesh = null;
+
+  createPaddle();
+  applyModifiersToPaddle();
+
+  if (gameStateData.useCustomGrid && gameStateData.customGrid) {
+    buildCustomLevel(gameStateData.customGrid, gameStateData.customSpawners || []);
+  } else {
+    generateLevel(gameStateData.level);
+  }
+
+  applyModifiers();
+}
+
+function createPaddle() {
+  if (paddle) { paddleGroup.remove(paddle); paddle.geometry.dispose(); paddle.material.dispose(); }
+  const geo = new THREE.BoxGeometry(CONFIG.PADDLE.width, CONFIG.PADDLE.height, CONFIG.PADDLE.depth);
+  const mat = new THREE.MeshPhongMaterial({ color: 0x4488ff, emissive: 0x112244, shininess: 80 });
+  paddle = new THREE.Mesh(geo, mat);
+  paddle.position.set(0, CONFIG.ARENA.paddleY, 0);
+  paddleGroup.add(paddle);
+}
+
+function generateLevel(levelNum) {
+  const a = CONFIG.ARENA;
+  const b = CONFIG.BRICK;
+  const cols = b.cols;
+  const rows = Math.min(b.rows + Math.floor(levelNum / 3), 8);
+  const totalWidth = cols * (b.width + b.padding) - b.padding;
+  const startX = -totalWidth / 2;
+  const brickSpacing = (a.right - a.left - totalWidth) / (cols + 1);
+
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      // Skip some bricks for variety based on level
+      if (levelNum > 1 && Math.random() < 0.1 * (levelNum - 1)) continue;
+
+      const type = pickBrickType(levelNum, row, col);
+      const hp = type === 'hard' ? 3 : 1;
+      const x = startX + col * (b.width + b.padding) + b.width / 2 + brickSpacing * (col + 1);
+      const y = b.startY - row * (b.height + b.padding);
+
+      createBrick(type, hp, x, y, row, col);
+    }
+  }
+}
+
+function pickBrickType(level, row, col) {
+  const r = Math.random();
+  if (level >= 3 && r < 0.15) return 'explosive';
+  if (level >= 2 && r < 0.25) return 'hard';
+  if (level >= 4 && r < 0.30) return 'shooter';
+  if (level >= 5 && r < 0.35) return 'portal';
+  if (level >= 3 && r < 0.40) return 'bonus';
+  if (level >= 2 && r < 0.45) return 'fragile';
+  return 'normal';
+}
+
+function createBrick(type, hp, x, y, row, col) {
+  const b = CONFIG.BRICK;
+  const geo = new THREE.BoxGeometry(b.width, b.height, b.depth);
+  const color = CONFIG.BRICK_COLORS[type] || 0x6688aa;
+  const mat = new THREE.MeshPhongMaterial({ color: color, emissive: color, emissiveIntensity: 0.1 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, 0);
+  bricksGroup.add(mesh);
+
+  const entry = { mesh: mesh, type: type, hp: hp, maxHp: hp, gridPos: { row: row, col: col } };
+  brickData.push(entry);
+  return entry;
+}
+
+function buildCustomLevel(grid, spawners) {
+  const b = CONFIG.BRICK;
+  const gw = editorState.gridWidth;
+  const gh = editorState.gridHeight;
+  const a = CONFIG.ARENA;
+  const totalWidth = gw * (b.width + b.padding) - b.padding;
+  const totalHeight = gh * (b.height + b.padding) - b.padding;
+  const startX = -totalWidth / 2;
+  const startY = a.top - 0.5;
+  const brickSpacingW = (a.right - a.left - totalWidth) / (gw + 1);
+  const brickSpacingH = (totalHeight) / (gh + 1);
+
+  for (let row = 0; row < gh; row++) {
+    for (let col = 0; col < gw; col++) {
+      const tile = grid[row][col];
+      if (tile === 'empty' || tile === 'spawner' || tile === 'ballstart') continue;
+      const hp = tile === 'hard' ? 3 : 1;
+      const x = startX + col * (b.width + b.padding) + b.width / 2 + brickSpacingW * (col + 1);
+      const y = startY - row * (b.height + b.padding) - brickSpacingH;
+      if (tile === 'wall') {
+        // Barrier wall - indestructible
+        const geo = new THREE.BoxGeometry(b.width, b.height, b.depth);
+        const mat = new THREE.MeshPhongMaterial({ color: 0x446666, transparent: true, opacity: 0.7 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, 0);
+        bricksGroup.add(mesh);
+        brickData.push({ mesh: mesh, type: 'wall', hp: 999, maxHp: 999, gridPos: { row, col }, indestructible: true });
+      } else if (tile === 'portal') {
+        const geo = new THREE.BoxGeometry(b.width, b.height, b.depth);
+        const mat = new THREE.MeshPhongMaterial({ color: 0x3333aa, emissive: 0x111155 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, 0);
+        bricksGroup.add(mesh);
+        const entry = { mesh: mesh, type: 'portal', hp: 1, maxHp: 1, gridPos: { row, col } };
+        brickData.push(entry);
+        portals.push(entry);
+      } else if (tile === 'shooter') {
+        const geo = new THREE.BoxGeometry(b.width, b.height, b.depth);
+        const mat = new THREE.MeshPhongMaterial({ color: 0x336633, emissive: 0x113311 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, 0);
+        bricksGroup.add(mesh);
+        brickData.push({ mesh: mesh, type: 'shooter', hp: 2, maxHp: 2, gridPos: { row, col }, shoots: true });
+      } else if (tile === 'explosive') {
+        const geo = new THREE.BoxGeometry(b.width, b.height, b.depth);
+        const mat = new THREE.MeshPhongMaterial({ color: 0xaa3333, emissive: 0x551111 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, 0);
+        bricksGroup.add(mesh);
+        brickData.push({ mesh: mesh, type: 'explosive', hp: 1, maxHp: 1, gridPos: { row, col } });
+      } else if (tile === 'bonus') {
+        const geo = new THREE.BoxGeometry(b.width, b.height, b.depth);
+        const mat = new THREE.MeshPhongMaterial({ color: 0xaa8833, emissive: 0x554411 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, 0);
+        bricksGroup.add(mesh);
+        brickData.push({ mesh: mesh, type: 'bonus', hp: 1, maxHp: 1, gridPos: { row, col } });
+      } else {
+        const hp2 = tile === 'fragile' ? 1 : (tile === 'hard' ? 3 : 1);
+        const color = CONFIG.BRICK_COLORS[tile] || 0x6688aa;
+        const geo = new THREE.BoxGeometry(b.width, b.height, b.depth);
+        const mat = new THREE.MeshPhongMaterial({ color: color, emissive: color, emissiveIntensity: 0.1 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.set(x, y, 0);
+        bricksGroup.add(mesh);
+        brickData.push({ mesh: mesh, type: tile, hp: hp2, maxHp: hp2, gridPos: { row, col } });
+      }
+    }
+  }
+
+  // Place spawners
+  if (spawners) {
+    spawners.forEach(function(sp) {
+      const geo = new THREE.BoxGeometry(0.4, 0.4, 0.4);
+      const mat = new THREE.MeshPhongMaterial({ color: 0x663366, emissive: 0x331133 });
+      const mesh = new THREE.Mesh(geo, mat);
+      const sx = startX + sp.col * (b.width + b.padding) + b.width / 2;
+      const sy = startY - sp.row * (b.height + b.padding);
+      mesh.position.set(sx, sy, 0);
+      bricksGroup.add(mesh);
+      brickData.push({ mesh: mesh, type: 'spawner', hp: 2, maxHp: 2, gridPos: { row: sp.row, col: sp.col }, shoots: true, fireRate: sp.fireRate || 3.0 });
+    });
+  }
+}
+
+// ============================================================
+// BALL SYSTEM
+// ============================================================
+let ballLaunchTimer = null;
+
+function spawnBall() {
+  if (currentState !== GameState.PLAYING) return;
+  const b = CONFIG.BALL;
+  const geo = new THREE.SphereGeometry(b.radius, 16, 16);
+  const mat = new THREE.MeshPhongMaterial({ color: 0xffffff, emissive: 0x444444 });
+  const ball = new THREE.Mesh(geo, mat);
+  ball.position.set(paddle ? paddle.position.x : 0, CONFIG.ARENA.paddleY + 0.3, 0);
+  scene.add(ball);
+
+  // Random launch angle (upward)
+  const angle = -Math.PI / 2 + (Math.random() - 0.5) * 0.8;
+  const speed = CONFIG.BALL.speed;
+  balls.push({
+    mesh: ball,
+    vx: Math.cos(angle) * speed,
+    vy: Math.sin(angle) * speed,
+    active: true
+  });
+
+  ballWasLaunched = true;
+}
+
+function resetBall() {
+  balls.forEach(function(b) {
+    if (b.mesh.parent) scene.remove(b.mesh);
+    b.mesh.geometry.dispose();
+    b.mesh.material.dispose();
+  });
+  balls = [];
+  ballWasLaunched = false;
+  // Respawn
+  ballLaunchTimer = setTimeout(function() {
+    if (currentState === GameState.PLAYING) spawnBall();
+  }, 800);
+}
+
+// ============================================================
+// PADDLE CONTROLS
+// ============================================================
+function updatePaddle(dt) {
+  if (!paddle) return;
+  const speed = CONFIG.PADDLE.speed * (1 + getModifierStack('widen') * 0.02);
+  let moving = false;
+  let moveDir = 0;
+
+  // Primary paddle: Arrow keys or A/D
+  if (keys['ArrowLeft'] || keys['KeyA']) moveDir -= 1;
+  if (keys['ArrowRight'] || keys['KeyD']) moveDir += 1;
+
+  // Dual Paddle: J/L for second paddle (visual only, ball hits both)
+  if (hasModifier('split')) {
+    if (keys['KeyJ']) moveDir -= 1; // Second paddle also moves with this
+    if (keys['KeyL']) moveDir += 1;
+  }
+
+  if (moveDir !== 0) {
+    paddle.position.x += moveDir * speed * dt;
+    moving = true;
+  }
+
+  // Assist Guide: subtle drift toward ball
+  if (hasModifier('autoaim') && balls.length > 0) {
+    const targetBall = balls[0];
+    const ballX = targetBall.mesh.position.x;
+    const paddleX = paddle.position.x;
+    const diff = ballX - paddleX;
+    paddle.position.x += diff * 0.5 * dt;
+  }
+
+  // Clamp to arena
+  const halfW = CONFIG.PADDLE.width / 2 + 0.2;
+  if (paddle.position.x < CONFIG.ARENA.left + halfW) paddle.position.x = CONFIG.ARENA.left + halfW;
+  if (paddle.position.x > CONFIG.ARENA.right - halfW) paddle.position.x = CONFIG.ARENA.right - halfW;
+}
+
+function applyModifiersToPaddle() {
+  if (!paddle) return;
+  const widenStack = getModifierStack('widen');
+  const baseWidth = CONFIG.PADDLE.width;
+  const newWidth = baseWidth * (1 + widenStack * 0.4);
+  paddle.scale.x = newWidth / baseWidth;
+}
+
+// ============================================================
+// COLLISION DETECTION
+// ============================================================
+function updateCollisions(dt) {
+  if (balls.length === 0) return;
+
+  for (let bi = 0; bi < balls.length; bi++) {
+    const ball = balls[bi];
+    if (!ball.active) continue;
+
+    const pos = ball.mesh.position;
+    const vel = { x: ball.vx, y: ball.vy };
+    const r = CONFIG.BALL.radius;
+    const a = CONFIG.ARENA;
+
+    // Wall collisions
+    if (pos.x - r <= a.left) {
+      ball.vx = Math.abs(ball.vx);
+      pos.x = a.left + r;
+    }
+    if (pos.x + r >= a.right) {
+      ball.vx = -Math.abs(ball.vx);
+      pos.x = a.right - r;
+    }
+    if (pos.y + r >= a.top) {
+      ball.vy = -Math.abs(ball.vy);
+      pos.y = a.top - r;
+    }
+
+    // Ball below arena floor
+    if (pos.y - r < a.bottom) {
+      if (hasModifier('shield') && !ball._shieldUsed) {
+        ball._shieldUsed = true;
+        removeShield();
+        ball.vy = Math.abs(ball.vy);
+        ball.mesh.position.y = a.bottom + r + 0.1;
+        showNotification('Barrier Wall absorbed the hit!', false, 'success');
+      } else {
+        ball.active = false;
+        if (ball.mesh.parent) scene.remove(ball.mesh);
+        ball.mesh.geometry.dispose();
+        ball.mesh.material.dispose();
+        loseLife();
+        return; // Stop processing this ball
+      }
+    }
+
+    // Ball-Paddle collision
+    if (checkBallPaddleCollision(ball)) {
+      applyBallPaddleCollision(ball);
+    }
+
+    // Ball-Brick collision
+    for (let i = 0; i < brickData.length; i++) {
+      const brick = brickData[i];
+      if (brick.hp <= 0 || brick.indestructible) continue;
+      if (checkBallBrickCollision(ball, brick)) {
+        applyBallBrickCollision(ball, brick, i);
+        break; // One brick per ball per frame
+      }
+    }
+
+    // Ball-Portal collision
+    for (let i = 0; i < portals.length; i++) {
+      const portal = portals[i];
+      if (portal.hp <= 0) continue;
+      const dx = pos.x - portal.mesh.position.x;
+      const dy = pos.y - portal.mesh.position.y;
+      if (Math.sqrt(dx * dx + dy * dy) < r + 0.5) {
+        // Find paired portal
+        const paired = portals.find(function(p) { return p !== portal && p.hp > 0; });
+        if (paired) {
+          pos.x = paired.mesh.position.x;
+          pos.y = paired.mesh.position.y;
+          ball.vx = -ball.vx; // Reverse direction
+          showNotification('Portal teleport!', false);
+        }
+        break;
+      }
+    }
+
+    // Ball-Bonus item collision
+    for (let i = 0; i < bonusItems.length; i++) {
+      const item = bonusItems[i];
+      const dx = pos.x - item.mesh.position.x;
+      const dy = pos.y - item.mesh.position.y;
+      if (Math.sqrt(dx * dx + dy * dy) < r + 0.3) {
+        item.collected = true;
+        addScore(50);
+        scene.remove(item.mesh);
+        bonusItems.splice(i, 1);
+        i--;
+        showNotification('+50 points!', false, 'success');
+      }
+    }
+  }
+}
+
+function checkBallPaddleCollision(ball) {
+  const pos = ball.mesh.position;
+  const r = CONFIG.BALL.radius;
+  const p = paddle;
+  const pw = p.scale.x * CONFIG.PADDLE.width / 2;
+  const ph = CONFIG.PADDLE.height / 2;
+  const px = p.position.x;
+  const py = p.position.y;
+
+  return (pos.x + r > px - pw && pos.x - r < px + pw &&
+          pos.y + r > py - ph && pos.y - r < py + ph);
+}
+
+function applyBallPaddleCollision(ball) {
+  const pos = ball.mesh.position;
+  const p = paddle;
+  const pw = p.scale.x * CONFIG.PADDLE.width / 2;
+  const hitOffset = (pos.x - p.position.x) / pw; // -1 to +1
+  const maxAngle = CONFIG.DEFLECTION_ANGLE;
+  const angle = hitOffset * maxAngle - Math.PI / 2; // upward
+
+  // Apply bounce boost
+  const boostStack = getModifierStack('bounce_boost');
+  const boostMult = 1 + boostStack * 0.15;
+
+  const speed = Math.sqrt(ball.vx * ball.vx + ball.vy * ball.vy) * boostMult;
+  const cappedSpeed = Math.min(speed, CONFIG.BALL.maxSpeed);
+
+  ball.vx = Math.cos(angle) * cappedSpeed;
+  ball.vy = Math.sin(angle) * cappedSpeed;
+
+  // Clamp to ensure upward movement
+  if (ball.vy > -0.5) ball.vy = -0.5;
+}
+
+function checkBallBrickCollision(ball, brick) {
+  const pos = ball.mesh.position;
+  const r = CONFIG.BALL.radius;
+  const brickMesh = brick.mesh;
+  const bx = brickMesh.position.x;
+  const by = brickMesh.position.y;
+  const bw = CONFIG.BRICK.width / 2;
+  const bh = CONFIG.BRICK.height / 2;
+
+  // AABB check first
+  if (pos.x + r < bx - bw || pos.x - r > bx + bw ||
+      pos.y + r < by - bh || pos.y - r > by + bh) {
+    return false;
+  }
+
+  // Distance check
+  const dx = pos.x - bx;
+  const dy = pos.y - by;
+  const dist = Math.sqrt(dx * dx + dy * dy);
+  return dist < r + Math.max(bw, bh);
+}
+
+function applyBallBrickCollision(ball, brick, index) {
+  // Determine collision side for reflection
+  const pos = ball.mesh.position;
+  const brickMesh = brick.mesh;
+  const dx = pos.x - brickMesh.position.x;
+  const dy = pos.y - brickMesh.position.y;
+
+  if (Math.abs(dx) / CONFIG.BRICK.width > Math.abs(dy) / CONFIG.BRICK.height) {
+    ball.vx = -ball.vx;
+  } else {
+    ball.vy = -ball.vy;
+  }
+
+  // Apply color sync damage
+  let damage = 1;
+  if (hasModifier('color_sync')) {
+    const paddleColor = paddle ? paddle.material.color.getHex() : 0x4488ff;
+    const brickColor = CONFIG.BRICK_COLORS[brick.type] || 0x6688aa;
+    // Simple color matching
+    if (paddleColor === brickColor || brick.type === 'normal') {
+      damage = 3; // +200%
+    }
+  }
+
+  brick.hp -= damage;
+
+  // Visual feedback - crack effect
+  if (brick.hp < brick.maxHp && brick.hp > 0) {
+    brickMesh.material.emissiveIntensity = 0.5;
+    setTimeout(function() {
+      if (brickMesh.material) brickMesh.material.emissiveIntensity = 0.1;
+    }, 200);
+  }
+
+  if (brick.hp <= 0) {
+    destroyBrick(brick, index, ball.mesh.position);
+  }
+
+  // Combo tracking
+  addCombo();
+}
+
+function destroyBrick(brick, index, hitPos) {
+  // Points
+  const points = CONFIG.BRICK_POINTS[brick.type] || 10;
+  addScore(points);
+
+  // Remove mesh
+  if (brick.mesh.parent) bricksGroup.remove(brick.mesh);
+  brick.mesh.geometry.dispose();
+  brick.mesh.material.dispose();
+  brick.hp = 0;
+
+  // Special brick behaviors
+  if (brick.type === 'explosive') {
+    triggerAOE(hitPos);
+  }
+  if (brick.type === 'bonus') {
+    spawnBonusItem(hitPos.x, hitPos.y);
+  }
+  if (hasModifier('multiball') && ['explosive', 'shooter', 'portal', 'bonus'].indexOf(brick.type) !== -1) {
+    spawnCloneBalls(hitPos.x, hitPos.y, 2);
+  }
+}
+
+function triggerAOE(centerPos) {
+  const radius = CONFIG.AOE_RADIUS;
+  const toDestroy = [];
+  for (let i = 0; i < brickData.length; i++) {
+    const brick = brickData[i];
+    if (brick.hp <= 0 || brick.indestructible) continue;
+    const dx = brick.mesh.position.x - centerPos.x;
+    const dy = brick.mesh.position.y - centerPos.y;
+    if (Math.sqrt(dx * dx + dy * dy) < radius) {
+      toDestroy.push(i);
+    }
+  }
+  // Process with recursion limit
+  processAOEDestruction(toDestroy, 1, CONFIG.AOE_RECURSION_LIMIT);
+}
+
+function processAOEDestruction(indices, depth, maxDepth) {
+  if (depth > maxDepth || indices.length === 0) return;
+  const newIndices = [];
+  indices.forEach(function(idx) {
+    const brick = brickData[idx];
+    if (brick.hp <= 0 || brick.indestructible) return;
+    const pos = brick.mesh.position.clone();
+    brick.hp -= 1;
+    if (brick.hp <= 0) {
+      destroyBrick(brick, idx, pos);
+      // Recursive AOE for explosive bricks
+      if (brick.type === 'explosive' && depth < maxDepth) {
+        newIndices.push(idx);
+      }
+    }
+  });
+  if (newIndices.length > 0) {
+    setTimeout(function() {
+      processAOEDestruction(newIndices, depth + 1, maxDepth);
+    }, 100);
+  }
+}
+
+function spawnBonusItem(x, y) {
+  const geo = new THREE.SphereGeometry(0.15, 8, 8);
+  const mat = new THREE.MeshPhongMaterial({ color: 0xffff00, emissive: 0x888800 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(x, y, 0);
+  bonusItemsGroup.add(mesh);
+  bonusItems.push({ mesh: mesh, vy: -1, collected: false, life: 5 });
+}
+
+function spawnCloneBalls(x, y, count) {
+  for (let i = 0; i < count; i++) {
+    const geo = new THREE.SphereGeometry(CONFIG.BALL.radius, 16, 16);
+    const mat = new THREE.MeshPhongMaterial({ color: 0xff6666, emissive: 0x441111 });
+    const ball = new THREE.Mesh(geo, mat);
+    ball.position.set(x, y, 0);
+    scene.add(ball);
+    const angle = Math.random() * Math.PI * 2;
+    const speed = CONFIG.BALL.speed * 0.8;
+    balls.push({
+      mesh: ball,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      active: true
+    });
+  }
+}
+
+// ============================================================
+// PROJECTILES
+// ============================================================
+function fireProjectileFromPaddle() {
+  const geo = new THREE.SphereGeometry(0.1, 8, 8);
+  const mat = new THREE.MeshPhongMaterial({ color: 0x00ff00, emissive: 0x004400 });
+  const mesh = new THREE.Mesh(geo, mat);
+  mesh.position.set(paddle.position.x, paddle.position.y + 0.3, 0);
+  projectilesGroup.add(mesh);
+  projectiles.push({ mesh: mesh, vx: 0, vy: 8, active: true });
+}
+
+function updateProjectiles(dt) {
+  for (let i = 0; i < projectiles.length; i++) {
+    const proj = projectiles[i];
+    if (!proj.active) continue;
+    proj.mesh.position.x += proj.vx * dt;
+    proj.mesh.position.y += proj.vy * dt;
+
+    // Projectile-Brick collision
+    for (let j = 0; j < brickData.length; j++) {
+      const brick = brickData[j];
+      if (brick.hp <= 0 || brick.indestructible) continue;
+      const dx = proj.mesh.position.x - brick.mesh.position.x;
+      const dy = proj.mesh.position.y - brick.mesh.position.y;
+      if (Math.abs(dx) < CONFIG.BRICK.width / 2 + 0.1 && Math.abs(dy) < CONFIG.BRICK.height / 2 + 0.1) {
+        brick.hp -= 1;
+        proj.active = false;
+        if (brick.hp <= 0) {
+          destroyBrick(brick, j, brick.mesh.position.clone());
+        }
+        scene.remove(proj.mesh);
+        projectiles.splice(i, 1);
+        i--;
+        break;
+      }
+    }
+
+    // Remove if out of bounds
+    if (proj.active && proj.mesh.position.y > CONFIG.ARENA.top + 1) {
+      proj.active = false;
+      scene.remove(proj.mesh);
+      projectiles.splice(i, 1);
+      i--;
+    }
+  }
+}
+
+// ============================================================
+// BONUS ITEMS UPDATE
+// ============================================================
+function updateBonusItems(dt) {
+  for (let i = 0; i < bonusItems.length; i++) {
+    const item = bonusItems[i];
+    if (item.collected) continue;
+    item.mesh.position.y += item.vy * dt;
+    item.vy -= 2 * dt; // Gravity
+    item.life -= dt;
+    if (item.life <= 0 || item.mesh.position.y < CONFIG.ARENA.bottom) {
+      scene.remove(item.mesh);
+      bonusItems.splice(i, 1);
+      i--;
+    }
+  }
+}
+
+// ============================================================
+// SHIELD
+// ============================================================
+function createShield() {
+  if (shieldMesh) scene.remove(shieldMesh);
+  const geo = new THREE.BoxGeometry(CONFIG.ARENA.right - CONFIG.ARENA.left, 0.1, 0.1);
+  const mat = new THREE.MeshPhongMaterial({ color: 0x44aaff, transparent: true, opacity: 0.5 });
+  shieldMesh = new THREE.Mesh(geo, mat);
+  shieldMesh.position.set(0, CONFIG.ARENA.bottom + 0.3, 0);
+  scene.add(shieldMesh);
+}
+
+function removeShield() {
+  if (shieldMesh) {
+    scene.remove(shieldMesh);
+    shieldMesh.geometry.dispose();
+    shieldMesh.material.dispose();
+    shieldMesh = null;
+  }
+}
+
+// ============================================================
+// GAME STATE TRACKING
+// ============================================================
+function loseLife() {
+  gameStateData.lives--;
+  updateHUD();
+  if (gameStateData.lives <= 0) {
+    transitionTo(GameState.GAME_OVER);
+  } else {
+    resetBall();
+  }
+}
+
+function addScore(points) {
+  const comboMult = Math.max(1, gameStateData.combo);
+  gameStateData.score += points * comboMult;
+  updateHUD();
+}
+
+function addCombo() {
+  gameStateData.combo++;
+  gameStateData.comboTimer = CONFIG.COMBO_WINDOW;
+  if (gameStateData.combo > gameStateData.highestCombo) {
+    gameStateData.highestCombo = gameStateData.combo;
+  }
+  // Show combo display
+  const comboEl = document.getElementById('comboDisplay');
+  if (gameStateData.combo > 1) {
+    comboEl.textContent = 'x' + gameStateData.combo + ' COMBO!';
+    comboEl.style.display = 'block';
+    comboEl.style.left = '50%';
+    comboEl.style.top = '40%';
+    comboEl.style.transform = 'translate(-50%, -50%)';
+    setTimeout(function() { comboEl.style.display = 'none'; }, 800);
+  }
+  updateHUD();
+}
+
+function checkLevelComplete() {
+  const destructible = brickData.filter(function(b) { return !b.indestructible && b.type !== 'wall' && b.type !== 'spawner'; });
+  const allDestroyed = destructible.length === 0 || destructible.every(function(b) { return b.hp <= 0; });
+  if (allDestroyed && destructible.length > 0) {
+    if (gameStateData.level >= CONFIG.MAX_LEVELS) {
+      transitionTo(GameState.VICTORY);
+    } else {
+      transitionTo(GameState.LEVEL_COMPLETE);
+    }
+  }
+}
+
+// ============================================================
+// MODIFIER SYSTEM
+// ============================================================
+function hasModifier(type) {
+  return gameStateData.modifiers.some(function(m) { return m.id === type; });
+}
+
+function getModifierStack(type) {
+  const m = gameStateData.modifiers.find(function(m) { return m.id === type; });
+  return m ? m.stack : 0;
+}
+
+function incrementModifierStack(type) {
+  const existing = gameStateData.modifiers.find(function(m) { return m.id === type; });
+  if (existing) {
+    const cap = CONFIG.MODIFIER_STACK_CAPS[type] || 99;
+    if (existing.stack < cap) {
+      existing.stack++;
+    }
+  } else {
+    gameStateData.modifiers.push({ id: type, stack: 1, appliedAt: Date.now() });
+  }
+  updateModifierIcons();
+}
+
+function applyModifiers() {
+  gameStateData.modifiers.forEach(function(mod) {
+    switch(mod.id) {
+      case 'split':
+        // Visual handled by input; no 3D change needed for second paddle
+        break;
+      case 'widen':
+        if (paddle) applyModifiersToPaddle();
+        break;
+      case 'shield':
+        if (mod.stack >= 1) createShield();
+        break;
+    }
+  });
+}
+
+function showModifierSelection() {
+  // Select 3 random modifiers
+  const allTypes = Object.keys(CONFIG.MODIFIER_DEFS);
+  const shuffled = allTypes.slice().sort(function() { return Math.random() - 0.5; });
+  const options = shuffled.slice(0, 3);
+
+  const container = document.getElementById('modifierCards');
+  container.innerHTML = '';
+
+  options.forEach(function(type, i) {
+    const def = CONFIG.MODIFIER_DEFS[type];
+    const card = document.createElement('div');
+    card.className = 'modifier-card';
+    card.setAttribute('data-type', type);
+
+    const stackCount = getModifierStack(type);
+    const cap = CONFIG.MODIFIER_STACK_CAPS[type] || 99;
+    const isMaxed = stackCount >= cap;
+
+    let conflictHtml = '';
+    const conflicts = def.conflictsWith;
+    const activeConflicts = conflicts.filter(function(c) { return hasModifier(c); });
+    if (activeConflicts.length > 0) {
+      conflictHtml = '<div class="card-conflict">Conflict with: ' + activeConflicts.join(', ') + '</div>';
+    }
+
+    card.innerHTML = '<div class="card-key">[' + (i + 1) + ']</div>' +
+      '<div class="card-name">' + def.name + '</div>' +
+      '<div class="card-desc">' + def.desc + '</div>' +
+      '<div class="card-stack">' + (isMaxed ? 'MAXED' : 'Stack: ' + (stackCount + 1) + '/' + cap) + '</div>' +
+      conflictHtml;
+
+    card.addEventListener('click', function() { selectModifier(i); });
+    container.appendChild(card);
+  });
+
+  document.getElementById('modifierOverlay').classList.add('active');
+  // Store options for selection
+  window._modifierOptions = options;
+}
+
+function selectModifier(index) {
+  if (!window._modifierOptions || index >= window._modifierOptions.length) return;
+  const type = window._modifierOptions[index];
+  const def = CONFIG.MODIFIER_DEFS[type];
+
+  // Check conflicts
+  const conflicts = def.conflictsWith;
+  const activeConflicts = conflicts.filter(function(c) { return hasModifier(c); });
+
+  if (activeConflicts.length > 0) {
+    // Overwrite conflicting modifier
+    gameStateData.modifiers = gameStateData.modifiers.filter(function(m) { return m.id !== activeConflicts[0]; });
+    showNotification('Overwrote ' + CONFIG.MODIFIER_DEFS[activeConflicts[0]].name, false, 'error');
+  }
+
+  incrementModifierStack(type);
+
+  // Log
+  gameStateData.modifierHistory.push({ type: type, name: def.name, timestamp: Date.now() });
+  runHistory.push({ type: 'modifier', data: def.name, timestamp: Date.now() });
+
+  document.getElementById('modifierOverlay').classList.remove('active');
+  gameStateData.level++;
+  transitionTo(GameState.PLAYING);
+}
+
+function declineModifier() {
+  document.getElementById('modifierOverlay').classList.remove('active');
+  gameStateData.level++;
+  transitionTo(GameState.PLAYING);
+}
+
+function updateModifierIcons() {
+  const container = document.getElementById('modifierIcons');
+  container.innerHTML = '';
+  gameStateData.modifiers.forEach(function(mod) {
+    const def = CONFIG.MODIFIER_DEFS[mod.id];
+    if (!def) return;
+    const icon = document.createElement('span');
+    icon.className = 'modifier-icon';
+    icon.textContent = def.name + (mod.stack > 1 ? ' x' + mod.stack : '');
+    container.appendChild(icon);
+  });
+}
+
+function toggleTimeScale() {
+  timeScale = timeScale === 1.0 ? 0.5 : 1.0;
+  showNotification('Time scale: ' + timeScale + 'x', false);
+}
+
+// ============================================================
+// GAME OVER & VICTORY
+// ============================================================
+function showGameOver() {
+  document.getElementById('hud').classList.remove('visible');
+  document.getElementById('gameOverOverlay').classList.add('active');
+
+  const elapsed = Math.floor((Date.now() - gameStateData.runStartTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+
+  document.getElementById('gameOverStats').innerHTML =
+    '<div class="stats-row"><span class="stats-label">Final Score</span><span class="stats-value">' + gameStateData.score + '</span></div>' +
+    '<div class="stats-row"><span class="stats-label">Levels Completed</span><span class="stats-value">' + gameStateData.levelsCompleted + '</span></div>' +
+    '<div class="stats-row"><span class="stats-label">Highest Combo</span><span class="stats-value">x' + gameStateData.highestCombo + '</span></div>' +
+    '<div class="stats-row"><span class="stats-label">Modifiers Chosen</span><span class="stats-value">' + gameStateData.modifierHistory.length + '</span></div>' +
+    '<div class="stats-row"><span class="stats-label">Time Played</span><span class="stats-value">' + mins + 'm ' + secs + 's</span></div>' +
+    '<div class="stats-row"><span class="stats-label">Modifiers</span><span class="stats-value">' +
+    (gameStateData.modifiers.length > 0 ? gameStateData.modifiers.map(function(m) {
+      const d = CONFIG.MODIFIER_DEFS[m.id];
+      return (d ? d.name : m.id) + (m.stack > 1 ? ' x' + m.stack : '');
+    }).join(', ') : 'None') + '</span></div>';
+}
+
+function showVictory() {
+  document.getElementById('hud').classList.remove('visible');
+  document.getElementById('victoryOverlay').classList.add('active');
+
+  const elapsed = Math.floor((Date.now() - gameStateData.runStartTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+
+  document.getElementById('victoryStats').innerHTML =
+    '<div class="stats-row"><span class="stats-label">Final Score</span><span class="stats-value">' + gameStateData.score + '</span></div>' +
+    '<div class="stats-row"><span class="stats-label">Levels Completed</span><span class="stats-value">' + gameStateData.levelsCompleted + '</span></div>' +
+    '<div class="stats-row"><span class="stats-label">Highest Combo</span><span class="stats-value">x' + gameStateData.highestCombo + '</span></div>' +
+    '<div class="stats-row"><span class="stats-label">Time Played</span><span class="stats-value">' + mins + 'm ' + secs + 's</span></div>';
+}
+
+function retryRun() {
+  // Reset but keep modifiers per UC-04 extension 4a
+  gameStateData.score = 0;
+  gameStateData.lives = CONFIG.DEFAULT_LIVES[gameStateData.difficulty] || CONFIG.DEFAULT_LIVES.normal;
+  gameStateData.level = 1;
+  gameStateData.combo = 0;
+  gameStateData.comboTimer = 0;
+  gameStateData.highestCombo = 0;
+  gameStateData.runStartTime = Date.now();
+  gameStateData.levelsCompleted = 0;
+  // Keep modifiers
+  transitionTo(GameState.PLAYING);
+}
+
+function playAgain() {
+  gameStateData.score = 0;
+  gameStateData.lives = CONFIG.DEFAULT_LIVES[gameStateData.difficulty] || CONFIG.DEFAULT_LIVES.normal;
+  gameStateData.level = 1;
+  gameStateData.modifiers = [];
+  gameStateData.combo = 0;
+  gameStateData.comboTimer = 0;
+  gameStateData.highestCombo = 0;
+  gameStateData.runStartTime = Date.now();
+  gameStateData.levelsCompleted = 0;
+  gameStateData.modifierHistory = [];
+  runHistory = [];
+  transitionTo(GameState.PLAYING);
+}
+
+// ============================================================
+// HUD
+// ============================================================
+function updateHUD() {
+  document.getElementById('hudScore').textContent = gameStateData.score;
+  document.getElementById('hudLives').textContent = gameStateData.lives;
+  document.getElementById('hudLevel').textContent = gameStateData.level;
+  document.getElementById('hudCombo').textContent = 'x' + Math.max(1, gameStateData.combo);
+  updateModifierIcons();
+}
+
+// ============================================================
+// NOTIFICATIONS
+// ============================================================
+let notifTimeout = null;
+function showNotification(msg, isError, isSuccess) {
+  const el = document.getElementById('notification');
+  el.textContent = msg;
+  el.className = 'visible' + (isError ? ' error' : '') + (isSuccess ? ' success' : '');
+  if (notifTimeout) clearTimeout(notifTimeout);
+  notifTimeout = setTimeout(function() { el.className = ''; }, 2500);
+}
+
+// ============================================================
+// MAP EDITOR
+// ============================================================
+function showEditor() {
+  document.getElementById('menuOverlay').classList.remove('active');
+  document.getElementById('editorOverlay').classList.add('active');
+  document.getElementById('hud').classList.remove('visible');
+  initEditorGrid();
+}
+
+function initEditorGrid() {
+  const gw = editorState.gridWidth;
+  const gh = editorState.gridHeight;
+  const gridEl = document.getElementById('editorGrid');
+  gridEl.innerHTML = '';
+  gridEl.style.gridTemplateColumns = 'repeat(' + gw + ', 36px)';
+
+  if (editorState.grid.length === 0 || editorState.grid.length !== gh) {
+    editorState.grid = [];
+    for (let r = 0; r < gh; r++) {
+      const row = [];
+      for (let c = 0; c < gw; c++) {
+        row.push('empty');
+      }
+      editorState.grid.push(row);
+    }
+  } else {
+    // Resize if needed
+    for (let r = 0; r < gh; r++) {
+      while (editorState.grid[r].length < gw) editorState.grid[r].push('empty');
+      editorState.grid[r] = editorState.grid[r].slice(0, gw);
+    }
+    while (editorState.grid.length < gh) {
+      const row = [];
+      for (let c = 0; c < gw; c++) row.push('empty');
+      editorState.grid.push(row);
+    }
+  }
+
+  for (let r = 0; r < gh; r++) {
+    for (let c = 0; c < gw; c++) {
+      const cell = document.createElement('div');
+      cell.className = 'editor-cell';
+      cell.setAttribute('data-row', r);
+      cell.setAttribute('data-col', c);
+      const tile = editorState.grid[r][c];
+      if (tile !== 'empty') cell.classList.add('t-' + tile);
+      cell.textContent = tile !== 'empty' ? tile[0].toUpperCase() : '';
+      cell.addEventListener('mousedown', onEditorCellClick);
+      cell.addEventListener('mouseenter', onEditorCellHover);
+      gridEl.appendChild(cell);
+    }
+  }
+}
+
+function onEditorCellClick(e) {
+  const r = parseInt(e.target.getAttribute('data-row'));
+  const c = parseInt(e.target.getAttribute('data-col'));
+  applyEditorTool(r, c);
+}
+
+function onEditorCellHover(e) {
+  if (!editorState.isMouseDown) return;
+  const r = parseInt(e.target.getAttribute('data-row'));
+  const c = parseInt(e.target.getAttribute('data-col'));
+  applyEditorTool(r, c);
+}
+
+function applyEditorTool(r, c) {
+  if (editorState.currentTool === 'brush') {
+    editorState.grid[r][c] = editorState.currentTile;
+  } else if (editorState.currentTool === 'eraser') {
+    editorState.grid[r][c] = 'empty';
+  } else if (editorState.currentTool === 'fill') {
+    floodFill(r, c, editorState.currentTile);
+  }
+  refreshEditorGrid();
+}
+
+function floodFill(r, c, newTile) {
+  const target = editorState.grid[r][c];
+  if (target === newTile) return;
+  const gw = editorState.gridWidth;
+  const gh = editorState.gridHeight;
+  const stack = [[r, c]];
+  const visited = new Set();
+  while (stack.length > 0) {
+    const [cr, cc] = stack.pop();
+    const key = cr + ',' + cc;
+    if (visited.has(key)) continue;
+    if (cr < 0 || cr >= gh || cc < 0 || cc >= gw) continue;
+    if (editorState.grid[cr][cc] !== target) continue;
+    visited.add(key);
+    editorState.grid[cr][cc] = newTile;
+    stack.push([cr - 1, cc], [cr + 1, cc], [cr, cc - 1], [cr, cc + 1]);
+  }
+}
+
+function refreshEditorGrid() {
+  const cells = document.getElementById('editorGrid').children;
+  for (let i = 0; i < cells.length; i++) {
+    const cell = cells[i];
+    const r = parseInt(cell.getAttribute('data-row'));
+    const c = parseInt(cell.getAttribute('data-col'));
+    const tile = editorState.grid[r][c];
+    cell.className = 'editor-cell' + (tile !== 'empty' ? ' t-' + tile : '');
+    cell.textContent = tile !== 'empty' ? tile[0].toUpperCase() : '';
+  }
+}
+
+function applyPattern(pattern) {
+  const gw = editorState.gridWidth;
+  const gh = editorState.gridHeight;
+  // Reset grid
+  for (let r = 0; r < gh; r++) {
+    for (let c = 0; c < gw; c++) {
+      editorState.grid[r][c] = 'empty';
+    }
+  }
+
+  switch(pattern) {
+    case 'pyramid':
+      for (let r = 0; r < gh; r++) {
+        const bricksInRow = gw - r * 2;
+        if (bricksInRow <= 0) break;
+        const startCol = r;
+        for (let c = 0; c < bricksInRow && startCol + c < gw; c++) {
+          editorState.grid[r][startCol + c] = 'normal';
+        }
+      }
+      break;
+    case 'checkerboard':
+      for (let r = 0; r < gh; r++) {
+        for (let c = 0; c < gw; c++) {
+          if ((r + c) % 2 === 0) editorState.grid[r][c] = 'normal';
+        }
+      }
+      break;
+    case 'spiral':
+      // Simple spiral pattern
+      let top = 0, bottom = gh - 1, left = 0, right = gw - 1;
+      let val = 'normal';
+      while (top <= bottom && left <= right) {
+        for (let c = left; c <= right; c++) editorState.grid[top][c] = val;
+        top++;
+        for (let r = top; r <= bottom; r++) editorState.grid[r][right] = val;
+        right--;
+        if (top <= bottom) {
+          for (let c = right; c >= left; c--) editorState.grid[bottom][c] = val;
+          bottom--;
+        }
+        if (left <= right) {
+          for (let r = bottom; r >= top; r--) editorState.grid[r][left] = val;
+          left++;
+        }
+        val = val === 'normal' ? 'hard' : 'normal';
+      }
+      break;
+    case 'random':
+      for (let r = 0; r < gh; r++) {
+        for (let c = 0; c < gw; c++) {
+          const roll = Math.random();
+          if (roll < 0.6) editorState.grid[r][c] = 'normal';
+          else if (roll < 0.75) editorState.grid[r][c] = 'hard';
+          else if (roll < 0.85) editorState.grid[r][c] = 'fragile';
+          else if (roll < 0.92) editorState.grid[r][c] = 'explosive';
+          else if (roll < 0.97) editorState.grid[r][c] = 'shooter';
+          else editorState.grid[r][c] = 'bonus';
+        }
+      }
+      break;
+  }
+  refreshEditorGrid();
+}
+
+function validateEditorMap() {
+  const errors = [];
+  const gw = editorState.gridWidth;
+  const gh = editorState.gridHeight;
+
+  // Check tile types
+  for (let r = 0; r < gh; r++) {
+    for (let c = 0; c < gw; c++) {
+      const tile = editorState.grid[r][c];
+      if (!CONFIG.VALID_TILE_TYPES.has(tile)) {
+        errors.push('Invalid tile at (' + r + ',' + c + '): ' + tile);
+      }
+    }
+  }
+
+  // Count spawners
+  let spawnerCount = 0;
+  for (let r = 0; r < gh; r++) {
+    for (let c = 0; c < gw; c++) {
+      if (editorState.grid[r][c] === 'spawner') spawnerCount++;
+    }
+  }
+  if (spawnerCount > CONFIG.MAX_SPAWNERS_PER_MAP) {
+    errors.push('Too many spawners: ' + spawnerCount + ' (max ' + CONFIG.MAX_SPAWNERS_PER_MAP + ')');
+  }
+
+  // Check portal pairing
+  let portalCount = 0;
+  for (let r = 0; r < gh; r++) {
+    for (let c = 0; c < gw; c++) {
+      if (editorState.grid[r][c] === 'portal') portalCount++;
+    }
+  }
+  if (portalCount % 2 !== 0) {
+    errors.push('Portals must be paired (found ' + portalCount + ')');
+  }
+
+  if (errors.length === 0) {
+    showNotification('Map is valid!', false, 'success');
+    return true;
+  } else {
+    showNotification('Validation errors: ' + errors.join('; '), true, true);
+    return false;
+  }
+}
+
+function serializeEditorMap() {
+  const name = document.getElementById('editorMapName').value || 'Custom Map';
+  const difficulty = document.getElementById('editorDifficulty').value;
+  const spawners = [];
+  for (let r = 0; r < editorState.gridHeight; r++) {
+    for (let c = 0; c < editorState.gridWidth; c++) {
+      if (editorState.grid[r][c] === 'spawner') {
+        spawners.push({ row: r, col: c, fireRate: 3.0 });
+      }
+    }
+  }
+  return {
+    id: 'map_' + Date.now() + '_' + Math.random().toString(36).substr(2, 6),
+    name: name,
+    gridWidth: editorState.gridWidth,
+    gridHeight: editorState.gridHeight,
+    tiles: editorState.grid,
+    spawners: spawners,
+    layoutSeed: Math.floor(Math.random() * 999999),
+    difficulty: difficulty
+  };
+}
+
+function saveMapToStorage() {
+  if (!validateEditorMap()) return false;
+
+  const mapData = serializeEditorMap();
+  let maps = getMapsFromStorage();
+
+  // Check quota
+  if (maps.length >= CONFIG.MAX_MAPS) {
+    showNotification('Storage full! Delete old maps first.', true);
+    return false;
+  }
+
+  maps.push(mapData);
+  try {
+    localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(maps));
+    showNotification('Map saved: ' + mapData.name + ' (' + mapData.id + ')', false, 'success');
+    return true;
+  } catch(e) {
+    showNotification('Save failed: ' + e.message, true);
+    return false;
+  }
+}
+
+function getMapsFromStorage() {
+  try {
+    const data = localStorage.getItem(CONFIG.STORAGE_KEY);
+    return data ? JSON.parse(data) : [];
+  } catch(e) {
+    return [];
+  }
+}
+
+function cleanupEditor() {
+  editorState.isMouseDown = false;
+  document.getElementById('editorOverlay').classList.remove('active');
+}
+
+// ============================================================
+// LOAD MAP
+// ============================================================
+function showLoadMapMenu() {
+  document.getElementById('menuOverlay').classList.remove('active');
+  document.getElementById('loadMapOverlay').classList.add('active');
+  const maps = getMapsFromStorage();
+  const list = document.getElementById('mapList');
+  list.innerHTML = '';
+
+  if (maps.length === 0) {
+    list.innerHTML = '<p style="color:#888;padding:20px;">No saved maps found.</p>';
+    return;
+  }
+
+  maps.forEach(function(map, idx) {
+    const item = document.createElement('div');
+    item.className = 'map-item';
+    item.innerHTML = '<div>' +
+      '<div class="map-name">' + (map.name || 'Untitled') + '</div>' +
+      '<div class="map-meta">' + (map.gridWidth || '?') + 'x' + (map.gridHeight || '?') + ' | ' + (map.difficulty || 'normal') + '</div>' +
+      '</div>' +
+      '<div class="map-actions">' +
+      '<button class="btn" onclick="window._loadMapPlay(' + idx + ')">Play</button>' +
+      '<button class="btn danger" onclick="window._loadMapDelete(' + idx + ')">Del</button>' +
+      '</div>';
+    list.appendChild(item);
+  });
+}
+
+function loadMapForPlay(idx) {
+  const maps = getMapsFromStorage();
+  if (idx < 0 || idx >= maps.length) return;
+  const map = maps[idx];
+
+  // Validate
+  if (!map.tiles || !Array.isArray(map.tiles)) {
+    showNotification('Map is corrupted. Try deleting it.', true);
+    return;
+  }
+
+  gameStateData.useCustomGrid = true;
+  gameStateData.customGrid = map.tiles;
+  gameStateData.customSpawners = map.spawners || [];
+  gameStateData.difficulty = map.difficulty || 'normal';
+
+  // Start game
+  gameStateData.score = 0;
+  gameStateData.lives = CONFIG.DEFAULT_LIVES[gameStateData.difficulty];
+  gameStateData.level = 1;
+  gameStateData.modifiers = [];
+  gameStateData.combo = 0;
+  gameStateData.comboTimer = 0;
+  gameStateData.highestCombo = 0;
+  gameStateData.runStartTime = Date.now();
+  gameStateData.levelsCompleted = 0;
+  gameStateData.modifierHistory = [];
+  runHistory = [];
+
+  document.getElementById('loadMapOverlay').classList.remove('active');
+  transitionTo(GameState.PLAYING);
+}
+
+function deleteMap(idx) {
+  let maps = getMapsFromStorage();
+  if (idx < 0 || idx >= maps.length) return;
+  const name = maps[idx].name || 'Untitled';
+  maps.splice(idx, 1);
+  localStorage.setItem(CONFIG.STORAGE_KEY, JSON.stringify(maps));
+  showNotification('Deleted: ' + name, false, 'success');
+  showLoadMapMenu();
+}
+
+// Make global for inline handlers
+window._loadMapPlay = loadMapForPlay;
+window._loadMapDelete = deleteMap;
+
+// ============================================================
+// GAME LOOP
+// ============================================================
+let lastTime = 0;
+
+function gameLoop(timestamp) {
+  requestAnimationFrame(gameLoop);
+
+  if (!lastTime) lastTime = timestamp;
+  let dt = (timestamp - lastTime) / 1000;
+  lastTime = timestamp;
+
+  // Clamp dt to prevent huge jumps
+  if (dt > 0.1) dt = 0.016;
+  dt *= timeScale;
+
+  if (currentState === GameState.PLAYING) {
+    // Update paddle
+    updatePaddle(dt);
+
+    // Update balls
+    balls.forEach(function(ball) {
+      if (!ball.active) return;
+      ball.mesh.position.x += ball.vx * dt;
+      ball.mesh.position.y += ball.vy * dt;
+    });
+
+    // Update collisions
+    updateCollisions(dt);
+
+    // Update projectiles
+    updateProjectiles(dt);
+
+    // Update bonus items
+    updateBonusItems(dt);
+
+    // Upward fire auto-timer
+    if (hasModifier('projectile')) {
+      upwardFireTimer += dt;
+      if (upwardFireTimer >= CONFIG.UPWARD_FIRE_INTERVAL) {
+        upwardFireTimer = 0;
+        fireProjectileFromPaddle();
+      }
+    }
+
+    // Shooter bricks
+    brickData.forEach(function(brick) {
+      if (!brick.shoots || brick.hp <= 0) return;
+      if (!shooterTimers[brick.mesh.uuid]) shooterTimers[brick.mesh.uuid] = 0;
+      shooterTimers[brick.mesh.uuid] += dt;
+      if (shooterTimers[brick.mesh.uuid] >= (brick.fireRate || CONFIG.SHOOTER_INTERVAL)) {
+        shooterTimers[brick.mesh.uuid] = 0;
+        // Fire downward projectile
+        const geo = new THREE.SphereGeometry(0.1, 8, 8);
+        const mat = new THREE.MeshPhongMaterial({ color: 0xff0000, emissive: 0x440000 });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(brick.mesh.position);
+        projectilesGroup.add(mesh);
+        projectiles.push({ mesh: mesh, vx: 0, vy: -5, active: true });
+      }
+    });
+
+    // Combo timer
+    if (gameStateData.comboTimer > 0) {
+      gameStateData.comboTimer -= dt;
+      if (gameStateData.comboTimer <= 0) {
+        gameStateData.combo = 0;
+        updateHUD();
+      }
+    }
+
+    // Check level complete
+    checkLevelComplete();
+
+    // Render
+    if (renderer && scene) {
+      renderer.render(scene, camera);
+    }
+  } else if (currentState === GameState.EDITOR) {
+    // Render editor background scene if needed
+    if (renderer && scene) {
+      renderer.render(scene, camera);
+    }
+  } else if (currentState === GameState.MENU) {
+    // Rotate scene slowly for menu background
+    if (renderer && scene) {
+      scene.rotation.y += 0.001;
+      renderer.render(scene, camera);
+    }
+  }
+}
+
+// ============================================================
+// INITIALIZATION
+// ============================================================
+function init() {
+  if (!initThreeJS()) {
+    // Fallback: show error on menu
+    document.getElementById('menuOverlay').classList.add('active');
+    return;
+  }
+
+  setupInput();
+
+  // Setup UI event listeners
+  document.getElementById('btnPlay').addEventListener('click', function() {
+    startNewGame();
+  });
+
+  document.getElementById('btnEditor').addEventListener('click', function() {
+    transitionTo(GameState.EDITOR);
+  });
+
+  document.getElementById('btnLoadMap').addEventListener('click', function() {
+    showLoadMapMenu();
+  });
+
+  document.getElementById('btnRetry').addEventListener('click', function() {
+    retryRun();
+  });
+
+  document.getElementById('btnMenuFromGO').addEventListener('click', function() {
+    transitionTo(GameState.MENU);
+  });
+
+  document.getElementById('btnPlayAgain').addEventListener('click', function() {
+    playAgain();
+  });
+
+  document.getElementById('btnMenuFromVictory').addEventListener('click', function() {
+    transitionTo(GameState.MENU);
+  });
+
+  document.getElementById('btnDecline').addEventListener('click', function() {
+    declineModifier();
+  });
+
+  document.getElementById('btnBackFromLoad').addEventListener('click', function() {
+    transitionTo(GameState.MENU);
+  });
+
+  document.getElementById('btnBackToMenu').addEventListener('click', function() {
+    transitionTo(GameState.MENU);
+  });
+
+  document.getElementById('btnPlayEditor').addEventListener('click', function() {
+    // Validate first
+    if (!validateEditorMap()) return;
+    gameStateData.useCustomGrid = true;
+    gameStateData.customGrid = editorState.grid.slice();
+    // Collect spawner positions
+    const spawners = [];
+    for (let r = 0; r < editorState.gridHeight; r++) {
+      for (let c = 0; c < editorState.gridWidth; c++) {
+        if (editorState.grid[r][c] === 'spawner') {
+          spawners.push({ row: r, col: c, fireRate: 3.0 });
+        }
+      }
+    }
+    gameStateData.customSpawners = spawners;
+    gameStateData.difficulty = document.getElementById('editorDifficulty').value;
+    gameStateData.score = 0;
+    gameStateData.lives = CONFIG.DEFAULT_LIVES[gameStateData.difficulty];
+    gameStateData.level = 1;
+    gameStateData.modifiers = [];
+    gameStateData.combo = 0;
+    gameStateData.comboTimer = 0;
+    gameStateData.highestCombo = 0;
+    gameStateData.runStartTime = Date.now();
+    gameStateData.levelsCompleted = 0;
+    gameStateData.modifierHistory = [];
+    runHistory = [];
+    transitionTo(GameState.PLAYING);
+  });
+
+  document.getElementById('btnSaveMap').addEventListener('click', function() {
+    saveMapToStorage();
+  });
+
+  document.getElementById('btnValidateMap').addEventListener('click', function() {
+    validateEditorMap();
+  });
+
+  // Editor tool buttons
+  document.querySelectorAll('[data-tool]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-tool]').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      editorState.currentTool = btn.getAttribute('data-tool');
+    });
+  });
+
+  document.querySelectorAll('[data-tile]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('[data-tile]').forEach(function(b) { b.classList.remove('active'); });
+      btn.classList.add('active');
+      editorState.currentTile = btn.getAttribute('data-tile');
+    });
+  });
+
+  document.querySelectorAll('[data-pattern]').forEach(function(btn) {
+    btn.addEventListener('click', function() {
+      applyPattern(btn.getAttribute('data-pattern'));
+    });
+  });
+
+  document.getElementById('editorGridSize').addEventListener('change', function() {
+    const parts = this.value.split('x');
+    editorState.gridWidth = parseInt(parts[0]);
+    editorState.gridHeight = parseInt(parts[1]);
+    initEditorGrid();
+  });
+
+  // Mouse down/up for drag painting in editor
+  document.getElementById('editorGrid').addEventListener('mousedown', function(e) {
+    editorState.isMouseDown = true;
+    if (e.target.classList.contains('editor-cell')) {
+      onEditorCellClick(e);
+    }
+  });
+  document.addEventListener('mouseup', function() {
+    editorState.isMouseDown = false;
+  });
+
+  // Window resize
+  window.addEventListener('resize', function() {
+    if (camera && renderer) {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    }
+  });
+
+  // Start game loop
+  requestAnimationFrame(gameLoop);
+}
+
+// Run on load
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}
+
+})(); // end IIFE
+</script>
+</body>
+</html>
