@@ -182,6 +182,7 @@ canvas { display: block; }
     <button class="diff-btn" data-diff="hard">Hard (1 life)</button>
   </div>
   <button class="menu-btn" id="btn-play">▶ PLAY</button>
+  <button class="menu-btn" id="btn-quickplay">⚡ QUICK PLAY</button>
   <button class="menu-btn" id="btn-editor">✎ MAP EDITOR</button>
   <button class="menu-btn" id="btn-load">◈ LOAD MAP</button>
 </div>
@@ -895,6 +896,8 @@ function checkPaddleBallCollisions() {
 // PHASE 5: LEVEL SYSTEM
 // ============================================================
 let levelData = null;
+let useCustomGrid = false;
+let customGridData = null;
 
 function startLevel() {
   clearScene();
@@ -907,8 +910,14 @@ function startLevel() {
   // Create paddle
   mainPaddle = createPaddle(0, 0xff6600);
 
-  // Generate level
-  generateLevel(gameStateData.level);
+  // Use custom grid if coming from editor
+  if (useCustomGrid) {
+    buildCustomLevel();
+    useCustomGrid = false;
+  } else {
+    // Generate procedural level
+    generateLevel(gameStateData.level);
+  }
 
   // Launch ball after delay
   setTimeout(() => {
@@ -956,7 +965,7 @@ function checkLevelComplete() {
   // Check if all destructible bricks are destroyed
   const remaining = bricks.filter(b => b.type !== 'portal' && b.type !== 'spawner');
   if (remaining.length === 0) {
-    if (gameStateData.level >= CONFIG.totalLevels) {
+    if (gameStateData.level >= CONFIG.totalLevels || gameStateData.level === 99) {
       transitionTo(GameState.VICTORY);
     } else {
       gameStateData.level++;
@@ -1322,6 +1331,53 @@ function serializeEditorMap() {
 }
 
 // ============================================================
+// DEFAULT MAP
+// ============================================================
+function createDefaultMap() {
+  const tiles = [];
+  const rows = [
+    { row: 0, types: ['hard','normal','normal','hard','normal','normal','hard','normal','normal','hard','normal','normal'] },
+    { row: 1, types: ['normal','explosive','normal','normal','shooter','normal','normal','shooter','normal','normal','explosive','normal'] },
+    { row: 2, types: ['normal','normal','fragile','normal','normal','normal','normal','normal','fragile','normal','normal','normal'] },
+    { row: 3, types: ['bonus','normal','normal','normal','portal','normal','normal','portal','normal','normal','normal','bonus'] },
+    { row: 4, types: ['normal','shooter','normal','normal','normal','normal','normal','normal','normal','normal','shooter','normal'] },
+    { row: 5, types: ['explosive','normal','normal','fragile','normal','normal','normal','normal','fragile','normal','normal','explosive'] },
+  ];
+  for (const r of rows) {
+    for (let c = 0; c < r.types.length; c++) {
+      tiles.push({ row: r.row, col: c, type: r.types[c] });
+    }
+  }
+  tiles.push({ row: 7, col: 5, type: 'spawner' });
+  tiles.push({ row: 7, col: 6, type: 'spawner' });
+
+  return {
+    id: 'default_map',
+    name: 'RogueBreaker Classic',
+    gridWidth: 12,
+    gridHeight: 8,
+    tiles: tiles,
+    difficulty: 'normal',
+    createdAt: Date.now(),
+    version: 1,
+  };
+}
+
+function ensureDefaultMapExists() {
+  const maps = loadSavedMaps();
+  const hasDefault = maps.some(m => m.id === 'default_map');
+  if (!hasDefault) {
+    const defMap = createDefaultMap();
+    maps.unshift(defMap);
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(maps));
+    } catch (e) {
+      // localStorage unavailable, skip
+    }
+  }
+}
+
+// ============================================================
 // PHASE 9: SAVE/LOAD SYSTEM (localStorage)
 // ============================================================
 const STORAGE_KEY = 'roguebreaker_maps';
@@ -1525,6 +1581,38 @@ function setupUI() {
 
   document.getElementById('btn-load').addEventListener('click', showLoadMapDialog);
 
+  document.getElementById('btn-quickplay').addEventListener('click', () => {
+    // Load default map into editor grid, then start playing
+    const maps = loadSavedMaps();
+    const defMap = maps.find(m => m.id === 'default_map');
+    if (defMap) {
+      editingMapData = defMap;
+      editorGrid = [];
+      for (let r = 0; r < CONFIG.gridRows; r++) {
+        editorGrid[r] = new Array(CONFIG.gridCols).fill('empty');
+      }
+      for (const tile of defMap.tiles) {
+        if (tile.row >= 0 && tile.row < CONFIG.gridRows && tile.col >= 0 && tile.col < CONFIG.gridCols) {
+          editorGrid[tile.row][tile.col] = tile.type;
+        }
+      }
+      // Reset game state
+      gameStateData.score = 0;
+      gameStateData.lives = CONFIG.difficultyLives[gameStateData.difficulty];
+      gameStateData.level = 1;
+      gameStateData.activeModifiers = [];
+      gameStateData.comboCount = 0;
+      gameStateData.highestCombo = 1;
+      gameStateData.modifierOrder = [];
+      gameStateData.startTime = performance.now();
+      useCustomGrid = true;
+      transitionTo(GameState.PLAYING);
+    } else {
+      // Fallback: just play procedural
+      document.getElementById('btn-play').click();
+    }
+  });
+
   // Editor tool buttons
   document.querySelectorAll('#tool-palette .tool-btn').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -1571,8 +1659,20 @@ function setupUI() {
       showNotification('Fix validation errors before playing!', 'error');
       return;
     }
-    // Convert editor grid to level
-    startCustomLevel();
+    // Reset game state for a custom map run
+    gameStateData.score = 0;
+    gameStateData.lives = CONFIG.difficultyLives[gameStateData.difficulty];
+    gameStateData.level = 1;
+    gameStateData.activeModifiers = [];
+    gameStateData.comboCount = 0;
+    gameStateData.highestCombo = 1;
+    gameStateData.modifierOrder = [];
+    gameStateData.startTime = performance.now();
+    // Transition to PLAYING which calls startLevel, but we override with custom map
+    transitionTo(GameState.PLAYING);
+    // startLevel() will be called by the state machine; we intercept by
+    // replacing generateLevel with our custom grid via a flag
+    useCustomGrid = true;
   });
 
   document.getElementById('btn-back-menu').addEventListener('click', () => {
@@ -1600,16 +1700,7 @@ function setupUI() {
   document.getElementById('btn-vic-menu').addEventListener('click', () => transitionTo(GameState.MENU));
 }
 
-function startCustomLevel() {
-  clearScene();
-  bricks = [];
-  balls = [];
-  projectiles = [];
-  projectileFireTimer = 0;
-  secondPaddle = null;
-
-  mainPaddle = createPaddle(0, 0xff6600);
-
+function buildCustomLevel() {
   // Place bricks from editor grid
   for (let r = 0; r < CONFIG.gridRows; r++) {
     for (let c = 0; c < CONFIG.gridCols; c++) {
@@ -1620,9 +1711,12 @@ function startCustomLevel() {
       createBrick(x, y, type);
     }
   }
-
   gameStateData.level = 99; // Custom level marker
-  setTimeout(() => { if (currentState === GameState.PLAYING) spawnBall(); }, CONFIG.launchDelay * 1000);
+}
+
+function startCustomLevel() {
+  // Legacy function: kept for backward compatibility
+  buildCustomLevel();
 }
 
 function showLoadMapDialog() {
@@ -1675,6 +1769,7 @@ function showLoadMapDialog() {
 function init() {
   initThreeJS();
   setupUI();
+  ensureDefaultMapExists();
   updateHUD();
   gameLoop();
   console.log('RogueBreaker initialized!');
