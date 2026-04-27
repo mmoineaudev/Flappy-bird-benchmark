@@ -415,7 +415,7 @@ const StateTransitions = {
   PAUSED: ['PLAYING', 'MENU'],
   LEVEL_COMPLETE: ['MODIFIER_SELECT'],
   MODIFIER_SELECT: ['PLAYING'],
-  GAME_OVER: ['MENU'],
+  GAME_OVER: ['MENU', 'PLAYING'],
   VICTORY: ['MENU'],
   EDITOR: ['PLAYING', 'MENU'],
 };
@@ -483,6 +483,7 @@ function hideHUD() { document.getElementById('hud').classList.remove('active'); 
 // --- BALL SYSTEM ---
 let ballMesh, ballVelocity = new THREE.Vector3();
 let balls = []; // Support multiball
+let ballWasLaunched = false; // Track if ball has been spawned (prevents false life-loss on level start)
 
 function createBall(position, velocity) {
   const geo = new THREE.SphereGeometry(CONFIG.ballRadius, 16, 16);
@@ -548,8 +549,8 @@ function updateBalls(dt) {
     }
   }
 
-  // If no balls left and we have lives, respawn
-  if (balls.length === 0 && gameStateData.lives > 0 && currentState === GameState.PLAYING) {
+  // If no balls left and we have lives, respawn (only after ball was actually launched)
+  if (balls.length === 0 && gameStateData.lives > 0 && currentState === GameState.PLAYING && ballWasLaunched) {
     gameStateData.lives--;
     updateHUD();
     setTimeout(() => {
@@ -571,6 +572,7 @@ function spawnBall() {
     new THREE.Vector3(mainPaddle.mesh.position.x, CONFIG.paddleY + 1, 0),
     dir.multiplyScalar(speed)
   );
+  ballWasLaunched = true;
 }
 
 // --- PADDLE SYSTEM ---
@@ -908,6 +910,7 @@ function startLevel() {
   projectiles = [];
   projectileFireTimer = 0;
   secondPaddle = null;
+  ballWasLaunched = false; // Reset launch flag for new level
 
   // Create paddle
   mainPaddle = createPaddle(0, 0xff6600);
@@ -984,6 +987,7 @@ function cleanupLevel() {
   bricks = [];
   balls = [];
   projectiles = [];
+  ballWasLaunched = false;
 }
 
 // ============================================================
