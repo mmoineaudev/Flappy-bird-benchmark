@@ -812,6 +812,7 @@ function checkAABB(posA, radA, meshB) {
 }
 
 function checkBallPaddleCollision(ball, paddle) {
+  if (!ball || !ball.radius || !paddle || !paddle.mesh) return false;
   const pb = new THREE.Box3().setFromObject(paddle.mesh);
   pb.expandByScalar(ball.radius);
 
@@ -884,6 +885,7 @@ function handlePortalTeleport(sourceBrick, ball) {
 }
 
 function checkPaddleBallCollisions() {
+  if (balls.length === 0) return false;
   let hit = false;
   if (checkBallPaddleCollision(balls[0], mainPaddle)) hit = true;
   if (secondPaddle && balls.length > 0) {
@@ -1668,11 +1670,9 @@ function setupUI() {
     gameStateData.highestCombo = 1;
     gameStateData.modifierOrder = [];
     gameStateData.startTime = performance.now();
-    // Transition to PLAYING which calls startLevel, but we override with custom map
-    transitionTo(GameState.PLAYING);
-    // startLevel() will be called by the state machine; we intercept by
-    // replacing generateLevel with our custom grid via a flag
+    // Set custom grid flag BEFORE transition so startLevel() picks it up
     useCustomGrid = true;
+    transitionTo(GameState.PLAYING);
   });
 
   document.getElementById('btn-back-menu').addEventListener('click', () => {
