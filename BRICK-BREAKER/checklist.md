@@ -320,6 +320,13 @@ This checklist is derived from the use case specifications and is designed to gu
   - [x] EDITOR PLAY MAP now sets useCustomGrid BEFORE transitionTo (timing fix)
   - [x] Ball spawn delay (1.5s) no longer causes game loop to crash
 
+- [x] **Fix immediate life loss on game start** (critical bug)
+  - [x] Root cause: game loop's "no balls = lose life" check triggered on frame 1 before ball spawned
+  - [x] Added `ballWasLaunched` flag, only set true after spawnBall() executes
+  - [x] Life-loss condition now checks `&& ballWasLaunched` to prevent false positives during launch delay
+  - [x] Flag reset in both startLevel() and cleanupLevel() for level transitions
+  - [x] Fixed GAME_OVER state transition: added 'PLAYING' as allowed target (RETRY button was blocked)
+
 ---
 
 ## Implementation Notes
