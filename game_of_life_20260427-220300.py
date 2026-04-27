@@ -179,21 +179,23 @@ class GameOfLife:
         return count
 
     def place_pattern(self, pattern_name):
-        """Place a named pattern centered in the grid."""
+        """Place a named pattern centered in the grid.
+        Pattern tuples are (col, row) = (x, y).
+        """
         self.clear()
         if pattern_name not in PATTERNS:
             return
         pattern = PATTERNS[pattern_name]
-        # Find bounding box
-        min_r = min(p[1] for p in pattern)
-        max_r = max(p[1] for p in pattern)
+        # Find bounding box — tuples are (col, row)
         min_c = min(p[0] for p in pattern)
         max_c = max(p[0] for p in pattern)
-        pat_h = max_r - min_r + 1
+        min_r = min(p[1] for p in pattern)
+        max_r = max(p[1] for p in pattern)
         pat_w = max_c - min_c + 1
+        pat_h = max_r - min_r + 1
         offset_r = self.rows // 2 - pat_h // 2
         offset_c = self.cols // 2 - pat_w // 2
-        for pr, pc in pattern:
+        for pc, pr in pattern:
             gr = (offset_r + pr) % self.rows
             gc = (offset_c + pc) % self.cols
             self.grid[gr][gc] = True
