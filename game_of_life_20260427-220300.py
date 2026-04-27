@@ -279,10 +279,8 @@ def main():
                     running = not running
                 elif event.key == pygame.K_r:
                     gol.randomize(0.35)
-                    running = False
                 elif event.key == pygame.K_c:
                     gol.clear()
-                    running = False
                 elif event.key == pygame.K_PLUS or event.key == pygame.K_EQUALS:
                     fps = min(MAX_FPS, fps + 1)
                     target_time = 1000.0 / fps
@@ -298,7 +296,6 @@ def main():
                     for btn in BUTTONS:
                         if btn["rect"].collidepoint(mx, my):
                             gol.place_pattern(btn["name"])
-                            running = False
                             break
                     else:
                         # Click in UI area but not on a button — ignore
