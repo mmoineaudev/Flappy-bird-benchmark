@@ -259,24 +259,23 @@ def main():
     gol = GameOfLife(GRID_COLS, GRID_ROWS, CELL_SIZE, BIRTH_RULES, SURVIVAL_MIN, SURVIVAL_MAX)
     gol.randomize(0.35)
 
-    running = False
+    paused = False
     fps = START_FPS
     target_time = 1000.0 / fps  # ms per frame
     elapsed = 0.0
 
-    running = True
-    while running:
+    while True:
         dt = clock.tick(fps)
         elapsed += dt
 
         # ── Events ──────────────────────────────────────────────────────
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
-                running = False
+                return
 
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
-                    running = not running
+                    paused = not paused
                 elif event.key == pygame.K_r:
                     gol.randomize(0.35)
                 elif event.key == pygame.K_c:
@@ -308,7 +307,7 @@ def main():
 
         # ── Game logic ──────────────────────────────────────────────────
         if elapsed >= target_time:
-            if running:
+            if not paused:
                 gol.step()
             elapsed = 0.0
 
@@ -353,8 +352,8 @@ def main():
             True, TEXT_COLOR
         )
         fps_text = font_small.render(f"Speed: {fps} fps", True, TEXT_COLOR)
-        state_text = font_small.render("PAUSED" if not running else "RUNNING",
-                                        True, NEON_CYAN if running else (255, 100, 100))
+        state_text = font_small.render("PAUSED" if paused else "RUNNING",
+                                        True, (255, 100, 100) if paused else NEON_CYAN)
 
         screen.blit(pop_text, (10, INFO_Y))
         screen.blit(frame_text, (10, INFO_Y + 22))
